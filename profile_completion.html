@@ -44,16 +44,13 @@ button{cursor:pointer;}
 <h1 id="pageTitle">استكمال البيانات الشخصية</h1>
 <p id="roleInfo" style="color: var(--blue-royal); font-weight: bold;"></p>
 
-<!-- أعلى الفورم مباشرة -->
-<div id="statusBox" style="display:none; padding:12px; margin-bottom:15px; text-align:center; font-weight:bold; border-radius:6px;"></div>
-
 <form id="completionForm">
     <div class="profile-img-container">
         <img id="imagePreview" class="profile-img-preview" src="images/guide_man.png" alt="صورة شخصية">
     </div>
     <div class="form-group">
         <label for="profilePicture">👤 صورة شخصية:</label>
-        <input type="file" id="profilePicture" accept="image/*" required onchange="previewImage(event)">
+        <input type="file" id="profilePicture" accept="image/*" required>
     </div>
 
     <div class="form-group">
@@ -79,9 +76,12 @@ button{cursor:pointer;}
     </div>
 
     <button type="submit" class="btn-submit">✅ إرسال البيانات</button>
-    
-    <div id="message-box" style="padding:15px; margin-top:20px; text-align:center; display:none;"></div>
 </form>
+
+<!-- ضع البوكس تحت الفورم -->
+<div id="statusBox" style="display:none; padding:12px; margin-top:15px; text-align:center; font-weight:bold; border-radius:6px;"></div>
+<div id="message-box" style="padding:15px; margin-top:20px; text-align:center; display:none;"></div>
+
 </div>
 
 <script type="module">
@@ -146,17 +146,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-function previewImage(event){
-    const file = event.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function() {
-        document.getElementById('imagePreview').src = reader.result;
-    };
-    reader.onerror = function() {
-        console.error("خطأ في قراءة الصورة");
-    };
-    reader.readAsDataURL(file);
+function previewImage(file){
+    return new Promise((resolve, reject)=>{
+        if(!file) return reject("لم يتم اختيار أي صورة");
+        const reader = new FileReader();
+        reader.onload = function() {
+            document.getElementById('imagePreview').src = reader.result;
+            resolve(reader.result);
+        };
+        reader.onerror = function() {
+            console.error("خطأ في قراءة الصورة");
+            reject("خطأ في قراءة الصورة");
+        };
+        reader.readAsDataURL(file);
+    });
 }
 
 function renderRoleFields(roleKey){
@@ -222,35 +225,36 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
     statusBox.style.backgroundColor='var(--blue-royal)';
     statusBox.textContent='⏳ جاري معالجة البيانات...';
 
-    const imgDataURL = document.getElementById('imagePreview').src;
-
-    let assistantData={
-        appId: appId,
-        name: document.getElementById('fullName').value.trim(),
-        age: parseInt(document.getElementById('age').value),
-        experience: parseInt(document.getElementById('experience').value),
-        about: document.getElementById('about').value.trim(),
-        img: imgDataURL
-    };
-
-    switch(roleKey){
-        case ROLES.GUIDE.key:
-            assistantData.guideType=document.getElementById('guideType').value;
-            assistantData.groupLimit=parseInt(document.getElementById('groupLimit').value) || 0;
-            assistantData.price=parseInt(document.getElementById('price').value) || 0;
-            break;
-        case ROLES.COMPANION.key:
-            assistantData.specialization=document.getElementById('specialization').value;
-            assistantData.priceDay=parseInt(document.getElementById('priceDay').value) || 0;
-            assistantData.priceHour=parseInt(document.getElementById('priceHour').value) || 0;
-            break;
-        case ROLES.DRIVER.key:
-            assistantData.cityPrice=parseInt(document.getElementById('cityPrice').value) || 0;
-            assistantData.outCityPrice=parseInt(document.getElementById('outCityPrice').value) || 0;
-            break;
-    }
-
     try{
+        const imgFile = document.getElementById('profilePicture').files[0];
+        const imgDataURL = await previewImage(imgFile);
+
+        let assistantData={
+            appId: appId,
+            name: document.getElementById('fullName').value.trim(),
+            age: parseInt(document.getElementById('age').value),
+            experience: parseInt(document.getElementById('experience').value),
+            about: document.getElementById('about').value.trim(),
+            img: imgDataURL
+        };
+
+        switch(roleKey){
+            case ROLES.GUIDE.key:
+                assistantData.guideType=document.getElementById('guideType').value;
+                assistantData.groupLimit=parseInt(document.getElementById('groupLimit').value) || 0;
+                assistantData.price=parseInt(document.getElementById('price').value) || 0;
+                break;
+            case ROLES.COMPANION.key:
+                assistantData.specialization=document.getElementById('specialization').value;
+                assistantData.priceDay=parseInt(document.getElementById('priceDay').value) || 0;
+                assistantData.priceHour=parseInt(document.getElementById('priceHour').value) || 0;
+                break;
+            case ROLES.DRIVER.key:
+                assistantData.cityPrice=parseInt(document.getElementById('cityPrice').value) || 0;
+                assistantData.outCityPrice=parseInt(document.getElementById('outCityPrice').value) || 0;
+                break;
+        }
+
         const newRef = push(ref(db, pathMap[roleKey]));
         await set(newRef, assistantData);
 
@@ -264,10 +268,9 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
         }
 
         statusBox.style.backgroundColor='var(--green-success)';
-        statusBox.textContent='✅ تم استكمال البيانات بنجاح!';
+        statusBox.innerHTML=`✅ تم استكمال البيانات بنجاح!<br>⚠️ كود الشات الخاص بك: ${appId}`;
 
         msgBox.innerHTML=`
-⚠️ يرجى الاحتفاظ بهذا الكود للدخول للشات الخاص بك.
 <br><button type="button" class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>
 `;
         msgBox.style.display='block';
