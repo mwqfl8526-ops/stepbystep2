@@ -5,50 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>البحث عن مساعد سياحي</title>
 <style>
-:root {
-    --blue-royal:#4a6fa5;
-    --gold:#ffc107;
-    --green-success:#4caf50;
-    --dark-bg:#121212;
-    --white:#e0e0e0;
-}
-body {background-color: var(--dark-bg); color: var(--white); font-family:'Segoe UI',sans-serif; margin:0;padding:0;}
-.cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 25px; margin:30px; }
-.assistant-card { background-color:#2a2a2a; border-radius:10px; padding:20px; border:1px solid var(--blue-royal); position: relative; }
-.card-header { display:flex; align-items:center; margin-bottom:15px; }
-.profile-img { width:70px;height:70px;border-radius:50%;object-fit:cover;border:2px solid var(--gold); margin-left:15px; }
-.card-header h3 { color:var(--gold); margin:0; font-size:1.4em; }
-.card-details p { margin:5px 0; color:#ccc; font-size:0.95em; }
-.rating { color: var(--gold); margin-top:5px; }
-.contact-btn, .comments-btn, .comment-submit { width:100%; padding:10px; border:none; border-radius:6px; margin-top:10px; cursor:pointer; font-weight:bold; }
-.contact-btn { background-color:var(--green-success); }
-.contact-btn:hover { background-color:#388e3c; }
-.comments-btn { background-color:var(--blue-royal); color:#fff; }
-.comments-btn:hover { background-color:#3b5b82; }
-.comment-section { display:none; background:#1f1f1f; padding:10px; border-radius:6px; margin-top:10px; max-height:300px; overflow-y:auto; }
-.comment-item { margin-bottom:8px; line-height:1.3em; padding-bottom:5px; border-bottom:1px dashed #444; }
-.comment-name { font-weight:bold; color:var(--gold); display:block; margin-bottom:2px; }
-.comment-stars { color:var(--gold); display:block; margin-bottom:2px; }
-.comment-text { display:block; color:#ccc; text-align:right; }
-.comment-input, .rating-select { width:100%; padding:6px; margin-top:5px; border-radius:4px; border:1px solid var(--blue-royal); background-color:#2a2a2a; color:#fff; }
-.close-comments { float:left;margin-bottom:5px; background:#cf6679;color:#fff;border:none;padding:2px 6px;border-radius:4px;cursor:pointer; }
+body { margin:0; font-family:Arial,sans-serif; background-color:#121212; color:#e0e0e0; }
+header { background-color:#1f1f1f; padding:12px; text-align:center; font-weight:bold; font-size:1.2em; position:sticky; top:0; z-index:10; }
+#searchContainer { display:flex; padding:12px; gap:8px; background-color:#1f1f1f; }
+#searchInput { flex:1; padding:10px; border-radius:20px; border:none; background-color:#2a2a2a; color:#fff; outline:none; }
+#searchBtn { padding:0 16px; border:none; border-radius:20px; background-color:#25d366; color:#fff; cursor:pointer; }
+#results { padding:12px; display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+.card { background-color:#1f1f1f; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:6px; }
+.card img { width:100%; border-radius:8px; object-fit:cover; height:140px; }
+.card h3 { margin:0; font-size:1em; color:#ffc107; }
+.card p { margin:0; font-size:0.9em; }
+.card button { padding:6px; border:none; border-radius:6px; background-color:#25d366; color:#fff; cursor:pointer; margin-top:auto; }
+.card button:hover { background-color:#128c7e; }
 </style>
 </head>
 <body>
-<div style="text-align:center; margin:20px;">
-    <h1>المساعدون المتاحون</h1>
-    <select id="roleFilter">
-        <option value="">جميع الرولز</option>
-        <option value="GUIDE">مرشد سياحي</option>
-        <option value="COMPANION">مرافق</option>
-        <option value="DRIVER">سائق</option>
-    </select>
+<header>البحث عن مساعد سياحي</header>
+
+<div id="searchContainer">
+    <input type="text" id="searchInput" placeholder="ابحث باسم، مدينة أو لغة...">
+    <button id="searchBtn">🔍 بحث</button>
 </div>
-<div id="assistantCardsGrid" class="cards-grid"></div>
+
+<div id="results"></div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, push, set } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, query, orderByChild, equalTo } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
@@ -62,120 +45,71 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
+const guidesRef = ref(db, 'guides'); // جدول المساعدين
 
-// تعريف الرولز
-const ROLES = {
-    GUIDE:{key:"GUIDE",name:"مرشد سياحي"},
-    COMPANION:{key:"COMPANION",name:"مرافق"},
-    DRIVER:{key:"DRIVER",name:"سائق"}
-};
+const resultsEl = document.getElementById('results');
+const searchInput = document.getElementById('searchInput');
 
-// مثال بيانات مؤقتة (يمكن استبداله بقراءة Firebase)
-let assistantsList = [
-    {chatCode:"A001",name:"أحمد",role:"GUIDE",experience:5,about:"مرشد سياحي خبير",guideType:"ثقافي",groupLimit:10,price:150,img:"images/guide_man.png"},
-    {chatCode:"B002",name:"سارة",role:"COMPANION",experience:3,about:"مرافقة ذوي احتياجات خاصة",specialization:"سمعي",priceDay:100,priceHour:15,img:"images/guide_woman.png"},
-    {chatCode:"C003",name:"محمد",role:"DRIVER",experience:7,about:"سائق ماهر",cityPrice:50,outCityPrice:100,img:"images/driver.png"}
-];
+function renderGuides(guides){
+    resultsEl.innerHTML = '';
+    if(!guides || guides.length===0){
+        resultsEl.innerHTML = '<p>لا توجد نتائج.</p>';
+        return;
+    }
+    guides.forEach(guide=>{
+        const card = document.createElement('div');
+        card.classList.add('card');
 
-// النجوم
-function renderStars(rating){ let stars=''; for(let i=1;i<=5;i++) stars+=i<=rating?'⭐':'☆'; return stars; }
+        const img = document.createElement('img');
+        img.src = guide.photo || 'https://via.placeholder.com/220x140?text=No+Image';
+        card.appendChild(img);
 
-// تحميل التعليقات من Firebase
-async function loadCommentsFromFirebase(code){
-    const snap = await get(ref(db, `assistantComments/${code}`));
-    return snap.exists() ? Object.values(snap.val()) : [];
-}
+        const name = document.createElement('h3');
+        name.textContent = guide.name;
+        card.appendChild(name);
 
-// عرض التعليقات
-async function loadComments(code){
-    const div=document.querySelector(`#comments-${code} .comments-list`);
-    div.innerHTML='';
-    const comments = await loadCommentsFromFirebase(code);
-    comments.forEach(c=>{
-        const el=document.createElement('div');
-        el.className='comment-item';
-        el.innerHTML=`<span class="comment-name">${c.name}</span><span class="comment-stars">${'⭐'.repeat(c.rating)}</span><span class="comment-text">${c.text}</span>`;
-        div.appendChild(el);
+        const city = document.createElement('p');
+        city.textContent = 'المدينة: ' + guide.city;
+        card.appendChild(city);
+
+        const language = document.createElement('p');
+        language.textContent = 'اللغة: ' + guide.language;
+        card.appendChild(language);
+
+        const btn = document.createElement('button');
+        btn.textContent = 'التواصل';
+        btn.onclick = ()=>{ window.location.href = `chat.html?code=${guide.chatCode}&name=`; };
+        card.appendChild(btn);
+
+        resultsEl.appendChild(card);
     });
 }
 
-// إرسال التعليق
-async function submitComment(code){
-    const nameInput=document.getElementById(`comment-name-${code}`);
-    const textInput=document.getElementById(`comment-input-${code}`);
-    const ratingSelect=document.getElementById(`comment-rating-${code}`);
-    const name=nameInput.value.trim()||"زائر";
-    const text=textInput.value.trim();
-    const rating=parseInt(ratingSelect.value);
-    if(!text){ alert("❌ الرجاء كتابة تعليق"); return; }
-    const commentData={name,text,rating};
-    const newRef = push(ref(db, `assistantComments/${code}`));
-    await set(newRef, commentData);
-    nameInput.value=''; textInput.value=''; ratingSelect.value='5';
-    await loadComments(code);
-    alert("✅ تم إرسال تعليقك بنجاح");
-}
+async function searchGuides(){
+    const term = searchInput.value.trim().toLowerCase();
+    if(!term) return alert('الرجاء كتابة شيء للبحث');
+    
+    // جلب كل المساعدين
+    const snapshot = await get(guidesRef);
+    const allGuides = snapshot.val();
+    const guidesList = [];
 
-// إظهار/إخفاء التعليقات
-function toggleComments(code){
-    const sec=document.getElementById(`comments-${code}`);
-    sec.style.display=sec.style.display==='block'?'none':'block';
-}
-
-// زر الشات
-function startChat(code,name){
-    window.location.href=`chat_page.html?code=${code}&name=${encodeURIComponent(name)}`;
-}
-
-// توليد البطاقات
-async function renderCards(list){
-    const grid = document.getElementById('assistantCardsGrid');
-    grid.innerHTML='';
-    if(list.length===0){ grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون</p>'; return; }
-    for(const a of list){
-        const card=document.createElement('div'); card.className='assistant-card';
-        card.innerHTML=`
-            <div class="card-header">
-                <img src="${a.img}" class="profile-img">
-                <div><h3>${a.name}</h3><div class="rating">${renderStars(5)} (${a.experience} سنة خبرة)</div></div>
-            </div>
-            <div class="card-details">
-                ${a.role==='GUIDE'?`<p><strong>تخصص:</strong> ${a.guideType}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit}</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`: ''}
-                ${a.role==='COMPANION'?`<p><strong>تخصص:</strong> ${a.specialization}</p><p><strong>سعر اليوم:</strong> ${a.priceDay}</p><p><strong>سعر الساعة:</strong> ${a.priceHour}</p>`: ''}
-                ${a.role==='DRIVER'?`<p><strong>أجرة المدينة:</strong> ${a.cityPrice}</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice}</p>`: ''}
-                <p><strong>نبذة:</strong> ${a.about}</p>
-            </div>
-            <button class="contact-btn" onclick="startChat('${a.chatCode}','${a.name}')">💬 تواصل الآن</button>
-            <button class="comments-btn" onclick="toggleComments('${a.chatCode}')">💬 التعليقات</button>
-            <div class="comment-section" id="comments-${a.chatCode}">
-                <button class="close-comments" onclick="toggleComments('${a.chatCode}')">✖</button>
-                <div class="comments-list"></div>
-                <input type="text" placeholder="اسمك..." class="comment-input" id="comment-name-${a.chatCode}">
-                <input type="text" placeholder="أضف تعليق..." class="comment-input" id="comment-input-${a.chatCode}">
-                <select class="rating-select" id="comment-rating-${a.chatCode}">
-                    <option value="1">⭐1</option><option value="2">⭐2</option>
-                    <option value="3">⭐3</option><option value="4">⭐4</option>
-                    <option value="5" selected>⭐5</option>
-                </select>
-                <button class="comment-submit" onclick="submitComment('${a.chatCode}')">إرسال التعليق</button>
-            </div>
-        `;
-        grid.appendChild(card);
-        await loadComments(a.chatCode);
+    for(const key in allGuides){
+        const g = allGuides[key];
+        // البحث باسم، مدينة أو لغة
+        if(g.name.toLowerCase().includes(term) || g.city.toLowerCase().includes(term) || g.language.toLowerCase().includes(term)){
+            guidesList.push({...g, chatCode:key});
+        }
     }
+
+    renderGuides(guidesList);
 }
 
-// فلتر حسب الدور
-document.getElementById('roleFilter').addEventListener('change', async function(){
-    const val=this.value;
-    const filtered = val ? assistantsList.filter(a=>a.role===val) : assistantsList;
-    await renderCards(filtered);
-});
+document.getElementById('searchBtn').addEventListener('click', searchGuides);
+searchInput.addEventListener('keypress', e=>{ if(e.key==='Enter') searchGuides(); });
 
-// عند التحميل
-document.addEventListener('DOMContentLoaded', async ()=>{
-    await renderCards(assistantsList);
-});
+// تحميل جميع المساعدين عند فتح الصفحة
+searchGuides();
 </script>
 </body>
 </html>
