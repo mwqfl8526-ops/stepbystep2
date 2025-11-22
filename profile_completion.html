@@ -86,7 +86,7 @@ button{cursor:pointer;}
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, set, child, push, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, set, push, update } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
@@ -147,9 +147,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 function previewImage(event){
+    const file = event.target.files[0];
+    if(!file) return;
     const reader = new FileReader();
-    reader.onload=function(){document.getElementById('imagePreview').src=reader.result;}
-    reader.readAsDataURL(event.target.files[0]);
+    reader.onload = function() {
+        document.getElementById('imagePreview').src = reader.result;
+    };
+    reader.onerror = function() {
+        console.error("خطأ في قراءة الصورة");
+    };
+    reader.readAsDataURL(file);
 }
 
 function renderRoleFields(roleKey){
@@ -210,7 +217,7 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
     const msgBox = document.getElementById('message-box');
     const statusBox = document.getElementById('statusBox');
 
-    // إظهار البوكس بحالة جاري المعالجة
+    msgBox.style.display='none';
     statusBox.style.display='block';
     statusBox.style.backgroundColor='var(--blue-royal)';
     statusBox.textContent='⏳ جاري معالجة البيانات...';
@@ -256,12 +263,12 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
             }
         }
 
-        // تحديث البوكس بالنجاح
         statusBox.style.backgroundColor='var(--green-success)';
         statusBox.textContent='✅ تم استكمال البيانات بنجاح!';
+
         msgBox.innerHTML=`
 ⚠️ يرجى الاحتفاظ بهذا الكود للدخول للشات الخاص بك.
-<br><button class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>
+<br><button type="button" class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>
 `;
         msgBox.style.display='block';
     }catch(err){
