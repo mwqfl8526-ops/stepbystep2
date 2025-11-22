@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سجل الطوارئ</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        body { background-color:#1e1e2f; color:#fff; font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0; }
+        .container { max-width:1200px; margin:auto; padding:20px; }
+        h1 { text-align:center; margin-bottom:20px; }
+        .header-controls { display:flex; justify-content:center; gap:15px; margin-bottom:20px; flex-wrap:wrap; }
+        .btn-back, .btn-primary { padding:10px 15px; border:none; border-radius:6px; cursor:pointer; font-weight:bold; }
+        .btn-back { background-color:#555; color:#fff; }
+        .btn-primary { background-color:#4169e1; color:#fff; }
+        .requests-table-container { overflow-x:auto; margin-top:20px; }
+        .requests-table { width:100%; border-collapse:collapse; margin-top:15px; }
+        .requests-table th, .requests-table td { border:1px solid #444; padding:12px 10px; text-align:right; }
+        .requests-table th { background-color:#4169e1; color:#fff; font-weight:bold; }
+        .requests-table tr:nth-child(even) { background-color:#2a2a2a; }
+        .requests-table tr:hover { background-color:#333; }
+    </style>
+</head>
+<body>
+    <div class="header-controls">
+        <a href="manager_dashboard.html" class="btn-back">🔙 لوحة المدير</a>
+    </div>
+
+    <div class="container">
+        <h1>سجل بلاغات الطوارئ 🚨</h1>
+        <p>هنا يتم عرض بلاغات الطوارئ المرسلة من السياح مع الاسم، رقم الهاتف والموقع الجغرافي.</p>
+        <button onclick="displayEmergencyLogs()" class="btn-primary" style="margin-top:15px;">🔄 تحديث السجل</button>
+        <button onclick="confirmDeleteAllLogs()" class="btn-back" style="background-color:#ff4d4d;">🗑️ حذف جميع السجلات</button>
+
+        <div class="requests-table-container">
+            <table class="requests-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>الاسم</th>
+                        <th>رقم الهاتف</th>
+                        <th>وقت البلاغ</th>
+                        <th>الموقع</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="emergencyTableBody"></tbody>
+            </table>
+        </div>
+        <p id="noLogsMessage" style="text-align:center; color:gold; margin-top:50px; display:none;">لا توجد بلاغات طوارئ جديدة.</p>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
+          authDomain: "tourguideapp-313c1.firebaseapp.com",
+          databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",
+          projectId: "tourguideapp-313c1",
+          storageBucket: "tourguideapp-313c1.firebasestorage.app",
+          messagingSenderId: "1036127588385",
+          appId: "1:1036127588385:web:d144dba8f70fe094395360"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function displayEmergencyLogs() {
+            const tbody = document.getElementById('emergencyTableBody');
+            const noLogsMessage = document.getElementById('noLogsMessage');
+            tbody.innerHTML = '';
+
+            db.ref('emergencies').once('value').then(snapshot=>{
+                const logs = snapshot.val();
+                if(!logs){ noLogsMessage.style.display='block'; return; }
+                noLogsMessage.style.display='none';
+                Object.values(logs).forEach(log=>{
+                    const tr = document.createElement('tr');
+                    let locationCell = log.location && log.location.gMapsURL
+                        ? `<a href="${log.location.gMapsURL}" target="_blank" class="btn-primary" style="background-color:#ff4d4d;">🔴 عرض الموقع الحي</a><br><small>(${log.location.lat}, ${log.location.lng})</small>`
+                        : log.location || "تعذر إرسال الموقع";
+                    tr.innerHTML=`
+                        <td>${log.id}</td>
+                        <td>${log.name || "غير معروف"}</td>
+                        <td>${log.phone || "غير محدد"}</td>
+                        <td>${log.time}</td>
+                        <td>${locationCell}</td>
+                        <td><button onclick="removeLog('${log.id}')" class="btn-back" style="background-color:#8c1a1a;">🗑️ حذف البلاغ</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function removeLog(id) {
+            if(confirm(`هل أنت متأكد من حذف بلاغ الطوارئ رقم ${id}؟`)){
+                db.ref('emergencies/' + id).remove()
+                  .then(()=> { alert('✅ تم حذف البلاغ بنجاح.'); displayEmergencyLogs(); })
+                  .catch(err=> { alert('❌ فشل حذف البلاغ.'); console.error(err); });
+            }
+        }
+
+        function confirmDeleteAllLogs() {
+            if(confirm("هل أنت متأكد من حذف جميع سجلات الطوارئ؟ هذا الإجراء لا يمكن التراجع عنه.")){
+                db.ref('emergencies').remove()
+                  .then(()=> { displayEmergencyLogs(); alert("✅ تم حذف جميع سجلات الطوارئ بنجاح."); })
+                  .catch(err=> { console.error(err); });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', displayEmergencyLogs);
+    </script>
+</body>
+</html>

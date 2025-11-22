@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الشكاوى والاقتراحات الواردة</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        body {
+            background-color: #1e1e2f;
+            color: #fff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .btn-back, .btn-primary {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .btn-back {
+            background-color: #555;
+            color: #fff;
+        }
+        .btn-primary {
+            background-color: #4169e1;
+            color: #fff;
+        }
+        .requests-table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+        .requests-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .requests-table th, .requests-table td {
+            border: 1px solid #444;
+            padding: 12px 10px;
+            text-align: right;
+        }
+        .requests-table th {
+            background-color: #4169e1;
+            color: #fff;
+            font-weight: bold;
+        }
+        .requests-table tr:nth-child(even) {
+            background-color: #2a2a2a;
+        }
+        .requests-table tr:hover {
+            background-color: #333;
+        }
+        .status-badge {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: #1e1e2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-controls">
+        <a href="manager_dashboard.html" class="btn-back">🔙 لوحة المدير</a>
+    </div>
+    <div class="container">
+        <h1>الشكاوى والاقتراحات الواردة 📧</h1>
+        <p>هنا يتم عرض جميع الرسائل الواردة من نموذج الشكاوى والاقتراحات.</p>
+        <button onclick="displayComplaints()" class="btn-primary" style="margin-top: 15px;">🔄 تحديث القائمة</button>
+
+        <div class="requests-table-container">
+            <table class="requests-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>وقت الإرسال</th>
+                        <th>النوع</th>
+                        <th>الاسم</th> 
+                        <th>الهاتف</th> 
+                        <th>تفاصيل الرسالة</th>
+                        <th>الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody id="complaintsTableBody"></tbody>
+            </table>
+        </div>
+        <p id="noComplaintsMessage" style="text-align:center; color:gold; margin-top:50px; display:none;">لا توجد شكاوى أو اقتراحات جديدة.</p>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
+          authDomain: "tourguideapp-313c1.firebaseapp.com",
+          databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",
+          projectId: "tourguideapp-313c1",
+          storageBucket: "tourguideapp-313c1.firebasestorage.app",
+          messagingSenderId: "1036127588385",
+          appId: "1:1036127588385:web:d144dba8f70fe094395360"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function displayComplaints() {
+            const tbody = document.getElementById('complaintsTableBody');
+            const noComplaintsMessage = document.getElementById('noComplaintsMessage');
+            tbody.innerHTML = '';
+
+            db.ref('complaints').once('value').then(snapshot => {
+                const complaints = snapshot.val();
+                if (!complaints) {
+                    noComplaintsMessage.style.display = 'block';
+                    return;
+                }
+                noComplaintsMessage.style.display = 'none';
+                Object.values(complaints).forEach(c => {
+                    const tr = document.createElement('tr');
+                    const badgeColor = c.type === 'شكوى' ? '#ff4d4d' : '#4169e1';
+                    tr.innerHTML = `
+                        <td>${c.id}</td>
+                        <td>${c.time}</td>
+                        <td><span class="status-badge" style="background-color:${badgeColor}; color:#fff;">${c.type}</span></td>
+                        <td>${c.name || 'غير محدد'}</td>
+                        <td>${c.phone || 'غير محدد'}</td>
+                        <td>${c.message.length>50 ? c.message.substring(0,50)+'...' : c.message}</td>
+                        <td><button onclick="viewAndRemove('${c.id}', '${c.message.replace(/'/g, "\\'")}', '${c.name.replace(/'/g, "\\'")}', '${c.phone.replace(/'/g, "\\'")}')" class="btn-back" style="background-color:#ff4d4d; border:none;">عرض/حذف</button></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            });
+        }
+
+        function viewAndRemove(id, message, name, phone) {
+            const fullMessage = message.replace(/\\'/g, "'");
+            const confirmationText = `رسالة (${id}) - النوع: ${name}\nالاسم: ${name}\nالهاتف: ${phone}\n\nالتفاصيل:\n${fullMessage}\n\nهل تريد حذف هذه الرسالة بعد قراءتها؟`;
+            if(confirm(confirmationText)) {
+                db.ref('complaints/' + id).remove()
+                  .then(()=> { alert('✅ تم حذف الرسالة بنجاح.'); displayComplaints(); })
+                  .catch(err=> { alert('❌ فشل حذف الرسالة.'); console.error(err); });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', displayComplaints);
+    </script>
+</body>
+</html>

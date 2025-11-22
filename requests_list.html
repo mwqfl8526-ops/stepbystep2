@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة مراجعة طلبات التوظيف</title>
+<style>
+:root {
+    --dark-bg: #1e1e1e;
+    --blue-royal: #128c7e;
+    --gold: #ffa500;
+    --white: #e0e0e0;
+    --yellow-warning: #ffeb3b;
+    --green-success: #4caf50;
+    --red-emergency: #f44336;
+}
+body { font-family: Arial, sans-serif; background-color:#121212; color:var(--white); margin:0; padding:0; }
+.container { max-width: 900px; margin: 30px auto; background-color: var(--dark-bg); padding: 20px; border-radius:10px; box-shadow:0 0 10px #000; }
+.tabs { display: flex; margin-bottom: 20px; border-bottom: 2px solid var(--gold); }
+.tab-button { padding: 10px 15px; cursor: pointer; background-color: var(--blue-royal); border: none; color: var(--white); font-weight: bold; border-radius: 8px 8px 0 0; margin-left: 5px; transition: background-color 0.3s, color 0.3s; }
+.tab-button.active { background-color: var(--gold); color: var(--dark-bg); border-bottom: 2px solid var(--gold); }
+.tab-content { padding-top: 10px; }
+.status-pill { padding: 5px 10px; border-radius: 5px; font-weight: bold; display: inline-block; }
+.status-pill.review { background-color: var(--yellow-warning); color: var(--dark-bg); }
+.status-pill.approved { background-color: var(--green-success); }
+.status-pill.rejected { background-color: var(--red-emergency); }
+.status-pill.completed { background-color: var(--blue-royal); }
+.btn-sm { padding: 5px 10px; font-size: 0.85em; border-radius: 4px; margin-left: 5px; cursor: pointer; }
+.header-controls { display:flex; justify-content:flex-start; align-items:center; margin-bottom:15px; }
+.btn-back { background-color:var(--blue-royal); color:var(--white); padding:8px 12px; border-radius:5px; text-decoration:none; font-weight:bold; margin-right:10px; }
+</style>
+</head>
+<body>
+
+<div class="header-controls">
+    <a href="manager_dashboard.html" class="btn-back">🏠 الرئيسية</a>
+    <button class="btn-back" style="background-color:var(--blue-royal);" id="refreshBtn">🔄 تحديث الطلبات</button>
+</div>
+
+<div class="container">
+<h1>مراجعة طلبات التوظيف 📝</h1>
+
+<div class="tabs">
+    <button class="tab-button active" data-tab="review">قيد المراجعة</button>
+    <button class="tab-button" data-tab="accepted">مقبولة (في انتظار الإكمال)</button>
+    <button class="tab-button" data-tab="archive">الأرشيف (مرفوضة / مكتملة)</button>
+</div>
+
+<div id="requestsTableContainer" class="tab-content">
+    <table class="requests-table" border="1" style="width:100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th>رقم الطلب</th>
+                <th>المتقدم</th>
+                <th>الوظيفة</th>
+                <th>الحالة</th>
+                <th>الإجراءات</th>
+            </tr>
+        </thead>
+        <tbody id="requestsTableBody"></tbody>
+    </table>
+    <p id="noRequestsMessage" style="text-align: center; color: var(--gold); margin-top: 50px; display: none;">لا توجد طلبات في هذا التبويب.</p>
+</div>
+</div>
+
+<!-- مودال عرض الملفات -->
+<div id="filesModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); justify-content:center; align-items:center; z-index:9999;">
+    <div style="background-color: var(--dark-bg); padding:20px; border-radius:10px; max-width:90%; max-height:90%; overflow:auto; position:relative;">
+        <button id="closeFilesModalBtn" style="position:absolute; top:10px; right:10px; padding:5px 10px; cursor:pointer;">❌ إغلاق</button>
+        <h2 style="text-align:center; color:var(--gold); margin-bottom:20px;">📑 ملفات الطلب</h2>
+        <div id="filesContainer" style="display:flex; flex-wrap:wrap; gap:15px; justify-content:center;"></div>
+    </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
+import { getDatabase, ref, get, update, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
+  authDomain: "tourguideapp-313c1.firebaseapp.com",
+  databaseURL: "https://tourguideapp-313c1-default-rtdb.firebaseio.com",
+  projectId: "tourguideapp-313c1",
+  storageBucket: "tourguideapp-313c1.firebasestorage.app",
+  messagingSenderId: "1036127588385",
+  appId: "1:1036127588385:web:d144dba8f70fe094395360"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+let currentTab = 'review';
+let currentApplications = [];
+
+const tabButtons = document.querySelectorAll('.tab-button');
+tabButtons.forEach(btn => {
+    btn.addEventListener('click', ()=>{
+        currentTab = btn.dataset.tab;
+        tabButtons.forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        displayRequests();
+    });
+});
+
+document.getElementById('refreshBtn').addEventListener('click', displayRequests);
+document.getElementById('closeFilesModalBtn').addEventListener('click', ()=>{
+    document.getElementById('filesModal').style.display='none';
+});
+
+function getStatusPill(status) {
+    let className = '';
+    if (status.includes('قيد المراجعة')) className = 'review';
+    else if (status.includes('تم القبول')) className = 'approved';
+    else if (status.includes('تم الرفض')) className = 'rejected';
+    else if (status.includes('تم الاكتمال')) className = 'completed';
+    return `<span class="status-pill ${className}">${status}</span>`;
+}
+
+function filterRequests(applications) {
+    if (currentTab === 'review') return applications.filter(app => app.status === 'قيد المراجعة');
+    else if (currentTab === 'accepted') return applications.filter(app => app.status === 'تم القبول');
+    else if (currentTab === 'archive') return applications.filter(app => app.status === 'تم الرفض' || app.status === 'تم الاكتمال');
+    return [];
+}
+
+function viewFiles(app){
+    const container=document.getElementById('filesContainer');
+    container.innerHTML='';
+    if(!app.files) return;
+    for(const key in app.files){
+        const arabicLabel = key
+            .replace('idFront','الهوية الوطنية وجه')
+            .replace('idBack','الهوية الوطنية ظهر')
+            .replace('cv','السيرة الذاتية')
+            .replace('licenseFront','الرخصة السياحية وجه')
+            .replace('licenseBack','الرخصة السياحية ظهر')
+            .replace('companionCard','كارنيه المرافق')
+            .replace('driverLicenseFront','رخصة القيادة وجه')
+            .replace('driverLicenseBack','رخصة القيادة ظهر');
+
+        app.files[key].forEach(fileData=>{
+            const div=document.createElement('div');
+            div.style.textAlign='center';
+            div.style.width='200px';
+            const label=document.createElement('p');
+            label.textContent=arabicLabel;
+            label.style.color='var(--gold)';
+            label.style.fontWeight='bold';
+            label.style.marginBottom='5px';
+            const img=document.createElement('img');
+            img.src=fileData;
+            img.style.width='100%';
+            img.style.border='1px solid #ccc';
+            img.style.borderRadius='6px';
+            img.style.objectFit='cover';
+            div.appendChild(label);
+            div.appendChild(img);
+            container.appendChild(div);
+        });
+    }
+    document.getElementById('filesModal').style.display='flex';
+}
+
+async function displayRequests() {
+    const snapshot = await get(ref(db, 'jobApplications'));
+    const data = snapshot.val() || {};
+    currentApplications = Object.entries(data).map(([key, value])=> ({id:key, ...value}));
+    const filtered = filterRequests(currentApplications);
+    const tbody = document.getElementById('requestsTableBody');
+    const noRequestsMessage = document.getElementById('noRequestsMessage');
+    tbody.innerHTML = '';
+
+    if(filtered.length===0){
+        noRequestsMessage.style.display='block';
+        return;
+    }
+    noRequestsMessage.style.display='none';
+
+    filtered.forEach(app=>{
+        const tr=document.createElement('tr');
+
+        const tdActions = document.createElement('td');
+
+        if(app.status==='قيد المراجعة'){
+            const acceptBtn=document.createElement('button');
+            acceptBtn.className='btn-sm';
+            acceptBtn.style.backgroundColor='var(--green-success)';
+            acceptBtn.textContent='✅ قبول';
+            acceptBtn.addEventListener('click', async ()=>{
+                if(confirm('هل أنت متأكد من قبول الطلب؟')){
+                    await update(ref(db,'jobApplications/'+app.id),{status:'تم القبول'});
+                    displayRequests();
+                }
+            });
+
+            const rejectBtn=document.createElement('button');
+            rejectBtn.className='btn-sm';
+            rejectBtn.style.backgroundColor='var(--red-emergency)';
+            rejectBtn.textContent='❌ رفض';
+            rejectBtn.addEventListener('click', async ()=>{
+                if(confirm('هل أنت متأكد من رفض الطلب؟')){
+                    await update(ref(db,'jobApplications/'+app.id),{status:'تم الرفض'});
+                    displayRequests();
+                }
+            });
+
+            const deleteBtn=document.createElement('button');
+            deleteBtn.className='btn-sm';
+            deleteBtn.style.backgroundColor='#555';
+            deleteBtn.textContent='🗑️ حذف';
+            deleteBtn.addEventListener('click', async ()=>{
+                if(confirm('هل أنت متأكد من حذف الطلب؟')){
+                    await remove(ref(db,'jobApplications/'+app.id));
+                    displayRequests();
+                }
+            });
+
+            const viewBtn=document.createElement('button');
+            viewBtn.className='btn-sm';
+            viewBtn.style.backgroundColor='var(--blue-royal)';
+            viewBtn.textContent='📂 عرض الملفات';
+            viewBtn.addEventListener('click', ()=>viewFiles(app));
+
+            tdActions.append(acceptBtn,rejectBtn,deleteBtn,viewBtn);
+
+        } else {
+            const statusSpan = document.createElement('span');
+            statusSpan.innerHTML = getStatusPill(app.status);
+            tdActions.appendChild(statusSpan);
+
+            const deleteBtn=document.createElement('button');
+            deleteBtn.className='btn-sm';
+            deleteBtn.style.backgroundColor='#555';
+            deleteBtn.textContent='🗑️ حذف';
+            deleteBtn.addEventListener('click', async ()=>{
+                if(confirm('هل أنت متأكد من حذف الطلب؟')){
+                    await remove(ref(db,'jobApplications/'+app.id));
+                    displayRequests();
+                }
+            });
+
+            const viewBtn=document.createElement('button');
+            viewBtn.className='btn-sm';
+            viewBtn.style.backgroundColor='var(--blue-royal)';
+            viewBtn.textContent='📂 عرض الملفات';
+            viewBtn.addEventListener('click', ()=>viewFiles(app));
+
+            tdActions.append(deleteBtn,viewBtn);
+        }
+
+        tr.innerHTML=`
+            <td>${app.id}</td>
+            <td>${app.fullName}</td>
+            <td>${app.roleKey || app.role}</td>
+            <td>${getStatusPill(app.status)}</td>
+        `;
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+    });
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+    displayRequests();
+    setInterval(displayRequests,60000);
+});
+</script>
+</body>
+</html>
