@@ -17,7 +17,12 @@
     --yellow-warning: #ffeb3b;
     --text-color: #e0e0e0;
 }
-body {background-color: var(--dark-bg); color: var(--text-color); font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0; direction:rtl;}
+body {
+    background-color: var(--dark-bg); 
+    color: var(--text-color); 
+    font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    margin:0; padding:0; direction:rtl;
+}
 .header-controls {display:flex; justify-content:flex-end; padding:15px; background-color:#1f1f1f; border-bottom:1px solid var(--border-color);}
 .btn-back {background-color:var(--blue-royal); color:#fff; padding:8px 15px; border-radius:6px; text-decoration:none; font-size:0.9em; transition:background-color 0.3s; border:none; cursor:pointer; margin-left:10px;}
 .profile-form-container {max-width: 600px; margin: 40px auto; padding: 30px; background-color: var(--card-bg); border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); border:1px solid var(--gold);}
@@ -30,7 +35,7 @@ button{cursor:pointer;}
 .btn-login:hover{background-color:#3b5b82;}
 .btn-submit{margin-top:30px; width:100%; padding:10px; background-color: var(--gold); border:none; border-radius:6px; color:var(--dark-bg); font-weight:bold;}
 .btn-submit:hover{background-color:#e0a800;}
-#statusBox{padding:15px; margin-top:20px; text-align:center; font-weight:bold; border-radius:6px; display:none;}
+#statusBox{padding:15px; margin-top:15px; text-align:center; font-weight:bold; border-radius:6px; display:none;}
 </style>
 </head>
 <body>
@@ -41,8 +46,6 @@ button{cursor:pointer;}
 <div class="profile-form-container">
     <h1 id="pageTitle">استكمال البيانات الشخصية</h1>
     <p id="roleInfo" style="color: var(--blue-royal); font-weight: bold;"></p>
-    
-    <div id="statusBox"></div>
     
     <form id="completionForm">
         <div class="profile-img-container">
@@ -71,6 +74,8 @@ button{cursor:pointer;}
         </div>
         <button type="submit" class="btn-submit">✅ إرسال البيانات</button>
     </form>
+
+    <div id="statusBox"></div> <!-- البوكس أسفل الزر -->
 </div>
 
 <script type="module">
@@ -98,7 +103,7 @@ const ROLES = {
 
 const urlParams = new URLSearchParams(window.location.search);
 const roleKey = urlParams.get('role');
-const appId = urlParams.get('appId'); // سيكون المفتاح المستخدم للchat والتعليقات
+const appId = urlParams.get('appId'); // سيستخدم للchat والتعليقات
 let currentApp = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -200,44 +205,45 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
     statusBox.style.backgroundColor='var(--blue-royal)';
     statusBox.textContent='⏳ جاري معالجة البيانات...';
 
-    const fileInput = document.getElementById('profilePicture');
-    const imgDataURL = await previewImage(fileInput.files[0]);
-
-    let assistantData={
-        appId: appId,
-        name: document.getElementById('fullName').value.trim(),
-        age: parseInt(document.getElementById('age').value),
-        experience: parseInt(document.getElementById('experience').value),
-        about: document.getElementById('about').value.trim(),
-        img: imgDataURL
-    };
-
-    switch(roleKey){
-        case ROLES.GUIDE.key:
-            assistantData.guideType=document.getElementById('guideType').value;
-            assistantData.groupLimit=parseInt(document.getElementById('groupLimit').value)||0;
-            assistantData.price=parseInt(document.getElementById('price').value)||0;
-            break;
-        case ROLES.COMPANION.key:
-            assistantData.specialization=document.getElementById('specialization').value;
-            assistantData.priceDay=parseInt(document.getElementById('priceDay').value)||0;
-            assistantData.priceHour=parseInt(document.getElementById('priceHour').value)||0;
-            break;
-        case ROLES.DRIVER.key:
-            assistantData.cityPrice=parseInt(document.getElementById('cityPrice').value)||0;
-            assistantData.outCityPrice=parseInt(document.getElementById('outCityPrice').value)||0;
-            break;
-    }
-
-    // حفظ المساعد باستخدام appId كمفتاح
-    const pathMap = {
-        [ROLES.GUIDE.key]: 'assistants_guides',
-        [ROLES.COMPANION.key]: 'assistants_companions',
-        [ROLES.DRIVER.key]: 'assistants_drivers'
-    };
-    const dbPath = pathMap[roleKey];
-
     try{
+        if(!appId) throw new Error('❌ رقم الطلب غير موجود.');
+
+        const fileInput = document.getElementById('profilePicture');
+        const imgDataURL = await previewImage(fileInput.files[0]);
+
+        let assistantData={
+            appId: appId,
+            name: document.getElementById('fullName').value.trim(),
+            age: parseInt(document.getElementById('age').value),
+            experience: parseInt(document.getElementById('experience').value),
+            about: document.getElementById('about').value.trim(),
+            img: imgDataURL
+        };
+
+        switch(roleKey){
+            case ROLES.GUIDE.key:
+                assistantData.guideType=document.getElementById('guideType').value;
+                assistantData.groupLimit=parseInt(document.getElementById('groupLimit').value)||0;
+                assistantData.price=parseInt(document.getElementById('price').value)||0;
+                break;
+            case ROLES.COMPANION.key:
+                assistantData.specialization=document.getElementById('specialization').value;
+                assistantData.priceDay=parseInt(document.getElementById('priceDay').value)||0;
+                assistantData.priceHour=parseInt(document.getElementById('priceHour').value)||0;
+                break;
+            case ROLES.DRIVER.key:
+                assistantData.cityPrice=parseInt(document.getElementById('cityPrice').value)||0;
+                assistantData.outCityPrice=parseInt(document.getElementById('outCityPrice').value)||0;
+                break;
+        }
+
+        const pathMap = {
+            [ROLES.GUIDE.key]: 'assistants_guides',
+            [ROLES.COMPANION.key]: 'assistants_companions',
+            [ROLES.DRIVER.key]: 'assistants_drivers'
+        };
+        const dbPath = pathMap[roleKey];
+
         await set(ref(db, `${dbPath}/${appId}`), assistantData);
 
         // تحديث حالة الطلب
@@ -249,14 +255,15 @@ document.getElementById('completionForm').addEventListener('submit', async (e)=>
         }
 
         statusBox.style.backgroundColor='var(--green-success)';
-        statusBox.innerHTML=`✅ تم استكمال البيانات بنجاح.<br>⚠️ احتفظ بالكود للدخول للشات ${appKey}.<br><button class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>`;
+        statusBox.innerHTML=`  ✅ تم استكمال البيانات بنجاح.<br>
+        ⚠️ الكود الخاص بك للشات: <strong>${appId}<br><button class="btn-login" onclick="goToAssistantLogin()">اذهب لتسجيل الدخول كمساعد</button>`;
     }catch(err){
         statusBox.style.backgroundColor='var(--red-emergency)';
-        statusBox.textContent='❌ حدث خطأ أثناء حفظ البيانات.';
+        statusBox.textContent='❌ حدث خطأ أثناء حفظ البيانات: '+err.message;
         console.error(err);
+    }finally{
+        submitButton.disabled=false;
     }
-
-    submitButton.disabled=false;
 });
 
 function goToAssistantLogin(){
@@ -264,4 +271,4 @@ function goToAssistantLogin(){
 }
 </script>
 </body>
-    </html>
+</html>
