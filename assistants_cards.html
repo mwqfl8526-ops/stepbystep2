@@ -58,7 +58,7 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
 <!-- مودل التعليقات -->
 <div id="commentsModal" class="modal-bg">
     <div class="modal-content">
-        <button class="close-modal" onclick="closeCommentsModal()">×</button>
+        <button class="close-modal">×</button>
         <h3 id="modalAssistantName"></h3>
         <div id="modalCommentsList"></div>
         <input type="text" placeholder="أدخل اسمك..." id="modalCommentName" class="comment-input">
@@ -70,7 +70,7 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
             <option value="4">⭐ 4</option>
             <option value="5" selected>⭐ 5</option>
         </select>
-        <button onclick="submitModalComment()" class="comment-submit">إرسال التعليق</button>
+        <button class="comment-submit">إرسال التعليق</button>
     </div>
 </div>
 
@@ -98,16 +98,16 @@ const ROLES = {
 };
 const keyMap = { GUIDE:'assistants_guides', COMPANION:'assistants_companions', DRIVER:'assistants_drivers' };
 
-// ⭐ دوال مساعدة
+// ⭐ الدوال المساعدة
 function renderStars(rating){
     let stars='';
     for(let i=1;i<=5;i++) stars+=i<=rating?'⭐':'☆';
     return stars;
 }
-function getAverageRating(comments){
+function getMajorityRating(comments){
     if(!comments || comments.length===0) return 5;
-    const sum = comments.reduce((acc,c)=>acc + c.rating,0);
-    return Math.round(sum / comments.length);
+    const avg = Math.round(comments.reduce((a,c)=>a+c.rating,0)/comments.length);
+    return avg;
 }
 
 // المودل
@@ -117,6 +117,9 @@ function openCommentsModal(code,name){
     document.getElementById('modalAssistantName').textContent=name;
     loadModalComments(code);
     document.getElementById('commentsModal').style.display='flex';
+
+    document.querySelector('.close-modal').onclick = closeCommentsModal;
+    document.querySelector('.comment-submit').onclick = submitModalComment;
 }
 function closeCommentsModal(){
     document.getElementById('commentsModal').style.display='none';
@@ -129,7 +132,9 @@ function loadModalComments(code){
     comments.slice(-20).forEach(c=>{
         const el=document.createElement('div');
         el.className='comment-item';
-        el.innerHTML=`<span class="comment-name">${c.name||'زائر'}</span><span class="comment-stars">${'⭐'.repeat(c.rating)}</span><span class="comment-text">${c.text}</span>`;
+        el.innerHTML=`<span class="comment-name">${c.name||'زائر'}</span>
+                        <span class="comment-stars">${'⭐'.repeat(c.rating)}</span>
+                        <span class="comment-text">${c.text}</span>`;
         div.appendChild(el);
     });
 }
@@ -139,8 +144,8 @@ function submitModalComment(){
     const text = document.getElementById('modalCommentText').value.trim();
     const rating = parseInt(document.getElementById('modalCommentRating').value);
     if(!text) return;
-    const comment = {name,text,rating};
 
+    const comment = {name,text,rating};
     const localKey = `comments_${currentModalCode}`;
     const existing = JSON.parse(localStorage.getItem(localKey)) || [];
     existing.push(comment);
@@ -150,19 +155,20 @@ function submitModalComment(){
     const newRef = push(ref(db, `assistantComments/${currentModalCode}`));
     set(newRef, comment);
 
-    document.getElementById('modalCommentName').value='';
-    document.getElementById('modalCommentText').value='';
-    document.getElementById('modalCommentRating').value='5';
-    loadModalComments(currentModalCode);
-
-    // تحديث البطاقة مباشرة
+    // تحديث الكارد مباشرة
     const card = document.querySelector(`.assistant-card[data-id='${currentModalCode}']`);
     if(card){
         const comments = JSON.parse(localStorage.getItem(localKey)) || [];
-        const avg = getAverageRating(comments);
+        const avgRating = getMajorityRating(comments);
         const ratingDiv = card.querySelector('.rating');
-        if(ratingDiv) ratingDiv.innerHTML = renderStars(avg);
+        if(ratingDiv) ratingDiv.innerHTML = renderStars(avgRating);
     }
+
+    loadModalComments(currentModalCode);
+
+    document.getElementById('modalCommentName').value='';
+    document.getElementById('modalCommentText').value='';
+    document.getElementById('modalCommentRating').value='5';
 
     alert("تم إرسال تعليقك بنجاح");
 }
@@ -184,8 +190,8 @@ async function renderCards(assistantsList,title){
         else if(a.cityPrice){ details+=`<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }
 
         const comments = JSON.parse(localStorage.getItem(`comments_${a.chatCode}`)) || [];
-        const avgRating = getAverageRating(comments);
-        const ratingHTML=`<div class="rating">${renderStars(avgRating)}</div><div>(${a.experience} سنوات خبرة)</div>`;
+        const majorityRating = getMajorityRating(comments);
+        const ratingHTML=`<div class="rating">${renderStars(majorityRating)}</div><div>(${a.experience} سنوات خبرة)</div>`;
 
         card.innerHTML=`
             <div class="card-header">
@@ -202,7 +208,6 @@ async function renderCards(assistantsList,title){
         grid.appendChild(card);
     });
 
-    // Event delegation للأزرار
     grid.addEventListener('click', (e)=>{
         const card = e.target.closest('.assistant-card');
         if(!card) return;
@@ -219,7 +224,7 @@ async function renderCards(assistantsList,title){
     });
 }
 
-// جلب البيانات مع التخزين في localStorage
+// جلب البيانات
 document.addEventListener('DOMContentLoaded', async()=>{
     const urlParams = new URLSearchParams(window.location.search);
     const roleKey = urlParams.get('role');
@@ -231,7 +236,6 @@ document.addEventListener('DOMContentLoaded', async()=>{
         renderCards(cachedData, roleKey ? ROLES[roleKey].name : "جميع المساعدين المتاحين");
     }
 
-    // Fetch من Firebase
     if(roleKey){
         const snap = await get(ref(db,keyMap[roleKey]));
         if(snap.exists()){
