@@ -112,6 +112,55 @@ function loadComments(code){
     });
 }
 
+// عند جلب المساعدين من Firebase
+async function renderCards(snapshot, roleTitle){
+    const grid = document.getElementById('assistantCardsGrid');
+    grid.innerHTML='';
+    document.getElementById('roleTitleDisplay').textContent = roleTitle;
+
+    if(!snapshot.exists()){
+        grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون متاحون حالياً لهذا الدور.</p>';
+        return;
+    }
+
+    Object.entries(snapshot.val()).forEach(([appId, a])=>{
+        // appId هو المفتاح، وبالتالي هو chatCode
+        const card = document.createElement('div');
+        card.className='assistant-card';
+        card.setAttribute('data-id', appId);
+
+        card.innerHTML=`
+            <div class="card-header">
+                <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
+                <div>
+                    <h3>${a.name}</h3>
+                    <div class="rating">${renderStars(getMajorityRating(a.comments))}</div>
+                    <div>(${a.experience || 0} سنوات خبرة)</div>
+                </div>
+            </div>
+            <div class="card-details"><p><strong>نبذة:</strong> ${a.about}</p></div>
+            <button class="contact-btn" onclick="startChat('${appId}','${a.name}')">💬 تواصل الآن</button>
+            <button class="comments-btn" onclick="toggleComments('${appId}')">💬 التعليقات</button>
+            <div class="comment-section" id="comments-${appId}">
+                <div class="comments-list"></div>
+                <input type="text" placeholder="أدخل اسمك..." class="comment-input" id="comment-name-${appId}">
+                <input type="text" placeholder="أضف تعليقاً..." class="comment-input" id="comment-input-${appId}">
+                <select class="rating-select" id="comment-rating-${appId}">
+                    <option value="1">⭐ 1</option>
+                    <option value="2">⭐ 2</option>
+                    <option value="3">⭐ 3</option>
+                    <option value="4">⭐ 4</option>
+                    <option value="5" selected>⭐ 5</option>
+                </select>
+                <button class="comment-submit" onclick="submitComment('${appId}')">إرسال التعليق</button>
+            </div>
+        `;
+        grid.appendChild(card);
+        loadComments(appId);
+    });
+}
+}
+
 function submitComment(code){
     const nameInput=document.getElementById(`comment-name-${code}`);
     const textInput=document.getElementById(`comment-input-${code}`);
