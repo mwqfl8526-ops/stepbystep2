@@ -129,6 +129,7 @@ currentModalCode=null;
 function loadModalComments(code){
 const div=document.getElementById('modalCommentsList');
 div.innerHTML='';
+// يتم جلب التعليقات من الذاكرة المحلية (localStorage) للعرض السريع
 let comments = JSON.parse(localStorage.getItem(`comments_${code}`)) || [];
 comments.slice(-20).forEach(c=>{
 const el=document.createElement('div');
@@ -143,13 +144,18 @@ const name = document.getElementById('modalCommentName').value.trim() || "زائ
 const text = document.getElementById('modalCommentText').value.trim();
 const rating = parseInt(document.getElementById('modalCommentRating').value);
 if(!text) return;
+
 const comment = {name,text,rating};
+
+// 1. الحفظ في الذاكرة المحلية (localStorage) (للعرض الفوري)
 const localKey = `comments_${currentModalCode}`;
 const existing = JSON.parse(localStorage.getItem(localKey)) || [];
 existing.push(comment);
 localStorage.setItem(localKey, JSON.stringify(existing));
 
-// حفظ في Firebase    
+// 2. الحفظ في Firebase
+// يتم إرسال التعليق إلى المسار assistantComments/{كود المساعد}
+// push() يُنشئ مفتاحًا فريدًا جديدًا (ID) لكل تعليق
 const newRef = push(ref(db, `assistantComments/${currentModalCode}`));    
 set(newRef, comment);    
 
@@ -169,14 +175,15 @@ if(assistantsList.length===0){ grid.innerHTML='<p style="text-align:center;color
 assistantsList.forEach(a=>{
 const card = document.createElement('div');
 card.className='assistant-card';
-card.setAttribute('data-id', a.chatCode);
+card.setAttribute('data-id', a.appId); 
 
 let details='';    
     if(a.groupLimit){ details+=`<p><strong>التخصص:</strong> ${a.guideType||'عام'}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }    
     else if(a.specialization){ details+=`<p><strong>التخصص:</strong> ${a.specialization}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }    
     else if(a.cityPrice){ details+=`<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }    
 
-    const comments = JSON.parse(localStorage.getItem(`comments_${a.chatCode}`)) || [];    
+    // يتم استخدام a.appId ككود للتعليقات
+    const comments = JSON.parse(localStorage.getItem(`comments_${a.appId}`)) || [];    
     const majorityRating = getMajorityRating(comments);    
     const ratingHTML=`<div class="rating">${renderStars(majorityRating)}</div><div>(${a.experience} سنوات خبرة)</div>`;    
 
@@ -189,8 +196,8 @@ let details='';
             </div>    
         </div>    
         <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>    
-        <button class="contact-btn" onclick="startChat('${a.chatCode}','${a.name}')">💬 تواصل الآن</button>    
-        <button class="comments-btn" onclick="openCommentsModal('${a.chatCode}','${a.name}')">💬 التعليقات</button>    
+        <button class="contact-btn" onclick="startChat('${a.appId}','${a.name}')">💬 تواصل الآن</button>    
+        <button class="comments-btn" onclick="openCommentsModal('${a.appId}','${a.name}')">💬 التعليقات</button>    
     `;    
     grid.appendChild(card);    
 });
@@ -209,7 +216,8 @@ if(cachedData){
     renderCards(cachedData, roleKey ? ROLES[roleKey].name : "جميع المساعدين المتاحين");    
 }    
 
-// Fetch من Firebase    
+// Fetch من Firebase
+// ملاحظة: يُفضل دائمًا جلب البيانات الجديدة من Firebase أولاً ثم تحديث localStorage
 if(roleKey){    
     const snap = await get(ref(db,keyMap[roleKey]));    
     if(snap.exists()){    
@@ -221,14 +229,19 @@ if(roleKey){
     const guides = (await get(ref(db,'assistants_guides'))).val() || {};    
     const companions = (await get(ref(db,'assistants_companions'))).val() || {};    
     const drivers = (await get(ref(db,'assistants_drivers'))).val() || {};    
-    const data = [...Object.values(guides),...Object.values(companions),...Object.values(drivers)];    
+    
+    const guidesList = Object.values(guides);
+    const companionsList = Object.values(companions);
+    const driversList = Object.values(drivers);
+    
+    const data = [...guidesList,...companionsList,...driversList];    
     localStorage.setItem(storageKey, JSON.stringify(data));    
     renderCards(data, "جميع المساعدين المتاحين");    
 }
 
 });
 
-// تم تعديل هذه الدالة لتمرير الكود فقط حسب طلبك
+// هذه الدالة تستخدم الكود (appId) للانتقال لصفحة الشات
 function startChat(code,name){ window.location.href=`chat_page.html?code=${code}`; }
 
 // ** إضافة الدوال للنطاق العام لحل مشكلة الـ Modal وزر التواصل **
