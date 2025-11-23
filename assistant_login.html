@@ -21,8 +21,8 @@ button:hover { opacity:0.9; }
     <div id="error" class="error"></div>
     <div id="success" class="success"></div>
 
-    <label>ادخل كود الشات:</label>
-    <input type="text" id="chatCode" placeholder="مثال: CHAT-12345">
+    <label>ادخل كود التطبيق (App ID):</label>
+    <input type="text" id="appIdInput" placeholder="مثال: 12345">
 
     <button id="loginBtn">تسجيل الدخول</button>
 </div>
@@ -45,19 +45,21 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 document.getElementById('loginBtn').addEventListener('click', async () => {
-    const chatCode = document.getElementById("chatCode").value.trim();
+    // 1. استخدام حقل الإدخال الجديد باسم appIdInput
+    const appId = document.getElementById("appIdInput").value.trim(); 
     const errorBox = document.getElementById("error");
     const successBox = document.getElementById("success");
 
     errorBox.style.display = "none";
     successBox.style.display = "none";
 
-    if (!chatCode) { errorBox.innerText="من فضلك اكتب كود الشات."; errorBox.style.display="block"; return; }
+    if (!appId) { errorBox.innerText="من فضلك اكتب كود التطبيق (App ID)."; errorBox.style.display="block"; return; }
 
     try {
         const assistantsSnapshot = await get(ref(db, 'assistants'));
         if (!assistantsSnapshot.exists()) throw new Error("لا يوجد مساعدون مسجلون.");
         const assistantsData = assistantsSnapshot.val();
+
         // دمج كل المساعدين في قائمة واحدة
         const allAssistants = [].concat(
             Object.values(assistantsData.guides||{}),
@@ -65,14 +67,25 @@ document.getElementById('loginBtn').addEventListener('click', async () => {
             Object.values(assistantsData.drivers||{})
         );
 
-        const found = allAssistants.find(a => a.chatCode === chatCode);
-        if (!found) { errorBox.innerText="كود الشات غير صحيح."; errorBox.style.display="block"; return; }
+        // 2. البحث عن المساعد باستخدام a.appId
+        const found = allAssistants.find(a => a.appId === appId); 
+        
+        if (!found) { 
+            errorBox.innerText="كود التطبيق (App ID) غير صحيح."; 
+            errorBox.style.display="block"; 
+            return; 
+        }
 
         successBox.innerText="تم تسجيل الدخول بنجاح!";
         successBox.style.display="block";
 
         const name = encodeURIComponent(found.name || "مساعد");
-        setTimeout(() => { window.location.href = `chat_page.html?code=${chatCode}&name=${name}&showClear=1`; }, 600);
+        
+        // 3. التوجيه إلى صفحة الشات باستخدام appId
+        setTimeout(() => { 
+            // نستخدم appId كـ 'code' للصفحة التالية، ونضيف name ونعلم الصفحة بأنها للمساعد (showClear=1)
+            window.location.href = `chat_page.html?code=${appId}&name=${name}&showClear=1`; 
+        }, 600);
     } catch (err) {
         errorBox.innerText = "❌ حدث خطأ: " + err.message;
         errorBox.style.display = "block";
