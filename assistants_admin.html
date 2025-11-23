@@ -111,7 +111,8 @@ roleSelect.addEventListener('change', () => {
 function renderStars(rating){ return '⭐'.repeat(rating)+'☆'.repeat(5-rating); }
 
 function getMajorityRating(comments){
-    if(!comments || comments.length===0) return 5;
+    if(!comments || Object.keys(comments).length===0) return 5;
+    // تحويل الكائن إلى مصفوفة إذا لم يكن كذلك
     const commentsArray = Array.isArray(comments) ? comments : Object.values(comments); 
     const counts = {};
     commentsArray.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1);
@@ -137,6 +138,7 @@ function renderCards(assistantsList, roleKey) {
     }
 
     assistantsList.forEach(a=>{
+        const assistantId = a.appId; // ⭐ تم تغيير chatCode إلى appId هنا
         const card = document.createElement('div');
         card.className='assistant-card';
         // إضافة سمات بيانات للفلترة
@@ -149,7 +151,7 @@ function renderCards(assistantsList, roleKey) {
         else if(a.cityPrice){ details += `<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }
 
         // استخدام التقييم المخزن في localStorage للعرض الأولي
-        const localStorageRatingKey = `comments_${a.appid}`;
+        const localStorageRatingKey = `comments_${assistantId}`;
         const cachedComments = JSON.parse(localStorage.getItem(localStorageRatingKey)) || {};
         const initialRating = getMajorityRating(cachedComments);
 
@@ -159,22 +161,22 @@ function renderCards(assistantsList, roleKey) {
                 <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
                 <div>
                     <h3>${a.name}</h3>
-                    <div class="rating" id="rating-${a.appid}">${renderStars(initialRating)} (${a.experience} سنوات)</div>
+                    <div class="rating" id="rating-${assistantId}">${renderStars(initialRating)} (${a.experience} سنوات)</div>
                 </div>
             </div>
             <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>
-            <button class="btn-delete" onclick="window.deleteAssistant('${roleKey}','${a.chatCode}')">حذف المساعد</button>
-            <button class="btn-comments" onclick="window.openCommentsModal('${a.chatCode}')">عرض التعليقات</button>
+            <button class="btn-delete" onclick="window.deleteAssistant('${roleKey}','${assistantId}')">حذف المساعد</button>
+            <button class="btn-comments" onclick="window.openCommentsModal('${assistantId}')">عرض التعليقات</button>
         `;
         grid.appendChild(card);
 
         // تفعيل listener لتقييم كل مساعد (للتحديث الآني للنجوم)
-        const ratingElement = document.getElementById(`rating-${a.chatCode}`);
-        const commentsRef = ref(db, `assistantComments/${a.chatCode}`);
+        const ratingElement = document.getElementById(`rating-${assistantId}`);
+        const commentsRef = ref(db, `assistantComments/${assistantId}`);
         
         const listener = onValue(commentsRef, snap=>{
             const commentsData = snap.val() || {};
-            // تحديث localStorage للتقييم
+            // تحديث localStorage للتقييم (نخزن قيم التعليقات فقط)
             localStorage.setItem(localStorageRatingKey, JSON.stringify(Object.values(commentsData)));
 
             const majorityRating = getMajorityRating(commentsData);
@@ -189,9 +191,14 @@ async function loadAndRenderAssistants(roleKey) {
     const storageKey = `manager_assistants_${roleKey}`;
     const grid = document.getElementById('assistantCardsGrid');  
 
+    if (!roleKey) {
+        grid.innerHTML = '';
+        return;
+    }
+
     // 1. العرض من التخزين المحلي (للسرعة)
     const cachedData = JSON.parse(localStorage.getItem(storageKey));
-    if (cachedData) {
+    if (cachedData && cachedData.length > 0) {
         allAssistants = cachedData;
         renderCards(allAssistants, roleKey);
     } else {
@@ -201,7 +208,9 @@ async function loadAndRenderAssistants(roleKey) {
     // 2. الجلب من Firebase والتحديث
     try {
         const snapshot = await get(ref(db, ROLES[roleKey]));
-        const freshData = snapshot.exists() ? Object.values(snapshot.val()) : [];
+        // التأكد من أن البيانات تأتي ككائن قبل تحويلها إلى مصفوفة
+        const rawData = snapshot.val();
+        const freshData = rawData ? Object.values(rawData) : [];
 
         // تحديث البيانات إذا كانت مختلفة عن المخزنة محلياً
         if (JSON.stringify(freshData) !== JSON.stringify(cachedData)) {
@@ -212,9 +221,10 @@ async function loadAndRenderAssistants(roleKey) {
     } catch(error) {
         console.error("Error fetching fresh data:", error);
         if (!cachedData) {
-             grid.innerHTML = '<p style="text-align:center;color:var(--red-emergency);">فشل جلب البيانات. الرجاء التحقق من الاتصال.</p>';
+             grid.innerHTML = '<p style="text-align:center;color:var(--red-emergency);">فشل جلب البيانات. الرجاء التحقق من الاتصال أو قاعدة البيانات.</p>';
         } else {
-            alert("فشل تحديث البيانات من الخادم، يتم عرض البيانات المخزنة مؤقتاً.");
+            // إذا كان هناك بيانات قديمة مخزنة، لا نعرض رسالة الخطأ على الواجهة
+            console.warn("فشل تحديث البيانات من الخادم، يتم عرض البيانات المخزنة مؤقتاً.");
         }
     }
 }
@@ -226,6 +236,7 @@ window.filterAssistants = function() {
     // فلترة القائمة المخزنة في allAssistants
     const filteredList = allAssistants.filter(a => {
         const nameMatch = a.name.toLowerCase().includes(searchTerm);
+        // التحقق من التخصص
         const specializationMatch = (a.guideType || a.specialization || a.role || '').toLowerCase().includes(searchTerm);
         return nameMatch || specializationMatch;
     });
@@ -235,21 +246,21 @@ window.filterAssistants = function() {
 
 
 // تعريف الدالة للنطاق العام (Window) لتكون قابلة للاستدعاء من onclick
-window.deleteAssistant = async function(roleKey, chatCode){
+window.deleteAssistant = async function(roleKey, appId){ // ⭐ تم تغيير chatCode إلى appId
     if(!confirm('هل أنت متأكد من حذف هذا المساعد؟ سيتم حذف جميع بياناته وتعليقاته.')) return;
     
     try {
-        // حذف المساعد من مسار دوره
-        await remove(ref(db, `${ROLES[roleKey]}/${appid}`));
-        // حذف جميع تعليقات المساعد
-        await remove(ref(db, `assistantComments/${appid}`));
+        // حذف المساعد من مسار دوره باستخدام appId
+        await remove(ref(db, `${ROLES[roleKey]}/${appId}`));
+        // حذف جميع تعليقات المساعد باستخدام appId
+        await remove(ref(db, `assistantComments/${appId}`));
         
         // إزالة البيانات المخزنة محلياً لهذا المساعد
-        localStorage.removeItem(`comments_${appid}`);
+        localStorage.removeItem(`comments_${appId}`);
         
+        alert("تم حذف المساعد بنجاح.");
         // إعادة تحميل وعرض القائمة لتحديث الواجهة
         loadAndRenderAssistants(roleKey); 
-        alert("تم حذف المساعد بنجاح.");
     } catch(error) {
         alert("فشل الحذف: " + error.message);
         console.error("Error deleting assistant:", error);
@@ -257,12 +268,12 @@ window.deleteAssistant = async function(roleKey, chatCode){
 }
 
 // تعريف الدالة للنطاق العام (Window)
-window.openCommentsModal = function(chatCode){
+window.openCommentsModal = function(appId){ // ⭐ تم تغيير chatCode إلى appId
     modalCommentsList.innerHTML='<p style="text-align:center;color:#ccc;">جاري التحميل...</p>';
     modal.style.display='flex';
 
     // نستخدم get() لمرة واحدة لجلب التعليقات للعرض في نافذة الإدارة
-    get(ref(db, `assistantComments/${appid}`)).then(snapshot => {
+    get(ref(db, `assistantComments/${appId}`)).then(snapshot => {
         modalCommentsList.innerHTML='';
         const comments = snapshot.val() || {};
         const commentKeys = Object.keys(comments);
@@ -284,9 +295,10 @@ window.openCommentsModal = function(chatCode){
                 delBtn.onclick=async()=>{ 
                     if(confirm('هل تريد حذف هذا التعليق؟')){ 
                         try {
-                            await remove(ref(db, `assistantComments/${appid}/${key}`)); 
+                            // الحذف باستخدام appId ومفتاح التعليق الفريد (key)
+                            await remove(ref(db, `assistantComments/${appId}/${key}`)); 
                             // إعادة فتح الـ Modal لتحديث القائمة بعد الحذف
-                            window.openCommentsModal(appid); 
+                            window.openCommentsModal(appId); 
                         } catch(error) {
                             alert("فشل حذف التعليق: " + error.message);
                         }
@@ -306,6 +318,15 @@ window.openCommentsModal = function(chatCode){
 window.closeCommentsModal = function(){ 
     modal.style.display='none'; 
 }
+
+// ⭐ تشغيل الدالة عند تحميل الصفحة لأول مرة (لجلب بيانات الدور المحدد إذا كان موجوداً)
+document.addEventListener('DOMContentLoaded', () => {
+    // حاول تحميل البيانات إذا كان الدور محدداً مسبقاً (في حال العودة للصفحة)
+    if (roleSelect.value) {
+        currentRoleKey = roleSelect.value;
+        loadAndRenderAssistants(currentRoleKey);
+    }
+});
 
 </script>
 </body>  
