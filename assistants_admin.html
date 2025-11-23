@@ -32,10 +32,12 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
 .card-details p{ margin:8px 0; text-align:right; font-size:0.95em; color:#ccc; }
 .card-details strong{ color:var(--white); }
 .rating{ color: var(--yellow-warning); font-size:1.1em; margin-top:5px; }
-.btn-delete{ margin-top:10px; padding:10px 16px; border:none; border-radius:6px; background-color:var(--red-emergency); color:#fff; cursor:pointer; font-size:1.1em; }
+.btn-delete, .btn-comments{ margin-top:10px; padding:10px 16px; border:none; border-radius:6px; background-color:var(--red-emergency); color:#fff; cursor:pointer; font-size:1.1em; width:48%; display:inline-block; }
+.btn-comments { background-color:var(--green-success); margin-left:4%; } /* تعديل بسيط للتنسيق */
 #commentsModal{ display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.6); justify-content:center; align-items:center; }
 #commentsModal .modal-content{ background-color:#2a2a2a; padding:20px; border-radius:10px; max-width:500px; width:90%; max-height:70%; overflow-y:auto; }
 .comment-item{ margin-bottom:10px; border-bottom:1px dashed #555; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center; }
+.comment-info { flex-grow: 1; margin-right: 10px; }
 .comment-name{ font-weight:bold; color:var(--gold); display:block; }
 .comment-stars{ color:var(--yellow-warning); display:block; margin:2px 0; }
 .comment-text{ display:block; color:#ccc; margin-top:2px; }
@@ -64,13 +66,14 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
 <div id="commentsModal">  
     <div class="modal-content">  
         <span class="close-modal" onclick="closeCommentsModal()">✖</span>  
+        <h2 style="color: var(--gold); border-bottom:1px solid #444; padding-bottom:10px;">تعليقات المساعد</h2>
         <div id="modalCommentsList"></div>  
     </div>  
 </div>  
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, remove, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, remove, onValue, off } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
@@ -90,89 +93,158 @@ const modal = document.getElementById('commentsModal');
 const modalCommentsList = document.getElementById('modalCommentsList');  
 
 const ROLES = { GUIDE:'assistants_guides', COMPANION:'assistants_companions', DRIVER:'assistants_drivers' };
+let currentRoleKey = '';
 
-roleSelect.addEventListener('change', () => { renderAssistants(roleSelect.value); });  
+// قائمة للاحتفاظ بـ Firebase Listeners لغرض إيقافها عند تغيير الدور
+let activeListeners = [];
+
+roleSelect.addEventListener('change', () => { 
+    currentRoleKey = roleSelect.value;
+    renderAssistants(currentRoleKey); 
+});  
 
 function renderStars(rating){ return '⭐'.repeat(rating)+'☆'.repeat(5-rating); }
 
 function getMajorityRating(comments){
     if(!comments || comments.length===0) return 5;
     const counts = {};
-    comments.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1);
+    // هنا نضمن التعامل مع البيانات إذا كانت على شكل مصفوفة أو كائن
+    const commentsArray = Array.isArray(comments) ? comments : Object.values(comments); 
+
+    commentsArray.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1);
     let max=0, major=5;
     for(const r in counts){ if(counts[r]>max){ max=counts[r]; major=parseInt(r); } }
     return major;
 }
 
+// إيقاف جميع الـ listeners النشطة
+function stopListeners() {
+    activeListeners.forEach(off);
+    activeListeners = [];
+}
+
+
 async function renderAssistants(roleKey){
+    stopListeners(); // إيقاف الـ listeners القديمة قبل البدء
     const grid = document.getElementById('assistantCardsGrid');  
     grid.innerHTML = '';  
     if(!roleKey) return;
 
-    const snapshot = await get(ref(db, ROLES[roleKey]));
-    const assistants = snapshot.exists()?Object.values(snapshot.val()):[];
+    try {
+        const snapshot = await get(ref(db, ROLES[roleKey]));
+        const assistants = snapshot.exists() ? Object.values(snapshot.val()) : [];
 
-    if(assistants.length===0){ grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون لهذا الدور.</p>'; return; }
+        if(assistants.length===0){ grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون لهذا الدور.</p>'; return; }
 
-    assistants.forEach(a=>{
-        const commentsRef = ref(db, `assistantComments/${a.chatCode}`);
-        let majorityRating = 5;
-        onValue(commentsRef, snap=>{ majorityRating=getMajorityRating(Object.values(snap.val()||{})); });
+        assistants.forEach(a=>{
+            const card = document.createElement('div');
+            card.className='assistant-card';
+            
+            let details='';
+            if(a.groupLimit){ details += `<p><strong>التخصص:</strong> ${a.guideType||''}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }
+            else if(a.specialization){ details += `<p><strong>التخصص:</strong> ${a.specialization||''}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }
+            else if(a.cityPrice){ details += `<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }
 
-        let details='';
-        if(a.groupLimit){ details += `<p><strong>التخصص:</strong> ${a.guideType}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }
-        else if(a.specialization){ details += `<p><strong>التخصص:</strong> ${a.specialization}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }
-        else if(a.cityPrice){ details += `<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }
-
-        const card = document.createElement('div');
-        card.className='assistant-card';
-        card.innerHTML=`
-            <div class="card-header">
-                <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
-                <div>
-                    <h3>${a.name}</h3>
-                    <div class="rating">${renderStars(majorityRating)} (${a.experience} سنوات)</div>
+            // إنشاء عناصر البطاقة
+            card.innerHTML=`
+                <div class="card-header">
+                    <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
+                    <div>
+                        <h3>${a.name}</h3>
+                        <div class="rating" id="rating-${a.chatCode}">⭐Loading... (${a.experience} سنوات)</div>
+                    </div>
                 </div>
-            </div>
-            <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>
-            <button class="btn-delete" onclick="deleteAssistant('${roleKey}','${a.chatCode}')">حذف المساعد</button>
-            <button class="btn-delete" onclick="openCommentsModal('${a.chatCode}')">عرض التعليقات</button>
-        `;
-        grid.appendChild(card);
-    });
+                <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>
+                <button class="btn-delete" onclick="window.deleteAssistant('${roleKey}','${a.chatCode}')">حذف المساعد</button>
+                <button class="btn-comments" onclick="window.openCommentsModal('${a.chatCode}')">عرض التعليقات</button>
+            `;
+            grid.appendChild(card);
+
+            // تفعيل listener لتقييم كل مساعد (هذا يضمن تحديث النجوم تلقائيًا)
+            const ratingElement = document.getElementById(`rating-${a.chatCode}`);
+            const commentsRef = ref(db, `assistantComments/${a.chatCode}`);
+            
+            const listener = onValue(commentsRef, snap=>{
+                const commentsData = snap.val() || {};
+                const majorityRating = getMajorityRating(commentsData);
+                ratingElement.innerHTML = `${renderStars(majorityRating)} (${a.experience} سنوات)`;
+            });
+            activeListeners.push(listener);
+
+        });
+    } catch(error) {
+        console.error("Error rendering assistants:", error);
+        grid.innerHTML = '<p style="text-align:center;color:var(--red-emergency);">حدث خطأ أثناء جلب البيانات.</p>';
+    }
 }
 
-async function deleteAssistant(roleKey, chatCode){
-    if(!confirm('هل تريد حذف هذا المساعد؟')) return;
-    await remove(ref(db, `${ROLES[roleKey]}/${chatCode}`));
-    await remove(ref(db, `assistantComments/${chatCode}`));
-    renderAssistants(roleKey);
+// تعريف الدالة للنطاق العام (Window) لتكون قابلة للاستدعاء من onclick
+window.deleteAssistant = async function(roleKey, chatCode){
+    if(!confirm('هل أنت متأكد من حذف هذا المساعد؟ سيتم حذف جميع بياناته وتعليقاته.')) return;
+    
+    try {
+        await remove(ref(db, `${ROLES[roleKey]}/${chatCode}`));
+        await remove(ref(db, `assistantComments/${chatCode}`));
+        
+        // إعادة عرض القائمة لتحديث الواجهة
+        renderAssistants(roleKey); 
+    } catch(error) {
+        alert("فشل الحذف: " + error.message);
+        console.error("Error deleting assistant:", error);
+    }
 }
 
-function openCommentsModal(chatCode){
-    modalCommentsList.innerHTML='';
-    const commentsRef = ref(db, `assistantComments/${chatCode}`);
-    onValue(commentsRef, snap=>{
+// تعريف الدالة للنطاق العام (Window)
+window.openCommentsModal = function(chatCode){
+    modalCommentsList.innerHTML='<p style="text-align:center;color:#ccc;">جاري التحميل...</p>';
+    modal.style.display='flex';
+
+    // نستخدم get() هنا لمرة واحدة بدلاً من onValue لتجنب التحديثات غير الضرورية في نافذة المشرف
+    get(ref(db, `assistantComments/${chatCode}`)).then(snapshot => {
         modalCommentsList.innerHTML='';
-        const comments = snap.val()?Object.values(snap.val()):[];
-        if(comments.length===0){ modalCommentsList.innerHTML='<p style="color:#aaa;text-align:center;">لا يوجد تعليقات حتى الآن.</p>'; }
-        else{
-            comments.forEach((c,i)=>{
+        const comments = snapshot.val() || {};
+        const commentKeys = Object.keys(comments);
+        
+        if(commentKeys.length===0){ 
+            modalCommentsList.innerHTML='<p style="color:#aaa;text-align:center;">لا يوجد تعليقات حتى الآن.</p>'; 
+        } else {
+            commentKeys.forEach((key, i) => {
+                const c = comments[key];
                 const div=document.createElement('div');
                 div.className='comment-item';
-                div.innerHTML=`<span><span class="comment-name">${c.name}</span><span class="comment-stars">${'⭐'.repeat(c.rating)}</span><span class="comment-text">${c.text}</span></span>`;
+                
+                div.innerHTML=`<span class="comment-info"><span class="comment-name">${c.name||'غير معروف'}</span><span class="comment-stars">${renderStars(c.rating)}</span><span class="comment-text">${c.text}</span></span>`;
+                
                 const delBtn=document.createElement('button');
                 delBtn.textContent="🗑️"; delBtn.style.cssText="background:var(--red-emergency);border:none;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer;";
-                delBtn.onclick=async()=>{ if(confirm('حذف التعليق؟')){ await remove(ref(db, `assistantComments/${chatCode}/${Object.keys(snap.val())[i]}`)); openCommentsModal(chatCode); } };
+                
+                // ربط زر الحذف بحذف التعليق الفردي
+                delBtn.onclick=async()=>{ 
+                    if(confirm('هل تريد حذف هذا التعليق؟')){ 
+                        try {
+                            // الحذف يتم باستخدام المفتاح الفريد (key) للتعليق
+                            await remove(ref(db, `assistantComments/${chatCode}/${key}`)); 
+                            // إعادة فتح الـ Modal لتحديث القائمة
+                            window.openCommentsModal(chatCode); 
+                        } catch(error) {
+                            alert("فشل حذف التعليق: " + error.message);
+                        }
+                    } 
+                };
                 div.appendChild(delBtn);
                 modalCommentsList.appendChild(div);
             });
         }
+    }).catch(error => {
+        console.error("Error fetching comments:", error);
+        modalCommentsList.innerHTML='<p style="color:var(--red-emergency);text-align:center;">فشل جلب التعليقات.</p>';
     });
-    modal.style.display='flex';
 }
 
-function closeCommentsModal(){ modal.style.display='none'; }
+// تعريف الدالة للنطاق العام (Window)
+window.closeCommentsModal = function(){ 
+    modal.style.display='none'; 
+}
 
 </script>
 </body>  
