@@ -129,12 +129,17 @@ async function getComments(placeId) {
     if(snapshot.exists()) return Object.values(snapshot.val());
     return [];
 }
-
-// حفظ طلب حجز جديد
-async function saveOrderFirebase(placeId, orderData) {
+// حفظ طلب حجز جديد باستخدام كود المكان كمفتاح رئيسي
+async function saveOrderFirebase(placeCode, orderData) {
+    // كل الطلبات تحت هذا الكود
     const ordersRef = ref(db, `bookings/${placeCode}`);
+    
+    // لو عايز كل طلب له مفتاح فريد داخلي
     const newOrderRef = push(ordersRef);
     await set(newOrderRef, orderData);
+
+    // لو عايز تحفظ الطلب مباشرة بكود المستخدم كمعرف فريد (بدون push)
+    // await set(ref(db, `bookings/${placeCode}`), orderData);
 }
 
 // حفظ تعليق جديد
