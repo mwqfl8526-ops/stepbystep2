@@ -75,7 +75,7 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, push, set, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, push, set } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 const firebaseConfig = {
 apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
@@ -98,154 +98,115 @@ DRIVER: {key:"DRIVER", name:"سائق نقل خاص"}
 
 const keyMap = { GUIDE:'assistants_guides', COMPANION:'assistants_companions', DRIVER:'assistants_drivers' };
 
-// ⭐ الدوال المساعدة
-function renderStars(rating){
-let stars='';
-for(let i=1;i<=5;i++) stars+=i<=rating?'⭐':'☆';
-return stars;
-}
+// ⭐ دوال مساعدة
+function renderStars(r){ let s=''; for(let i=1;i<=5;i++) s+=i<=r?'⭐':'☆'; return s; }
+function getMajorityRating(comments){ if(!comments || comments.length===0) return 5; const counts={}; comments.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1); let max=0,majority=5; for(const r in counts){ if(counts[r]>max){ max=counts[r]; majority=parseInt(r); } } return majority; }
 
-// تقوم بحساب التقييم بناءً على أغلبية التعليقات
-function getMajorityRating(comments){
-if(!comments || comments.length===0) return 5;
-const counts={};
-comments.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1);
-let max=0, majority=5;
-for(const r in counts){ if(counts[r]>max){ max=counts[r]; majority=parseInt(r); } }
-return majority;
-}
-
-// المودل
+// Modal
 let currentModalCode = null;
-function openCommentsModal(code,name){
-currentModalCode=code;
-document.getElementById('modalAssistantName').textContent=name;
-loadModalComments(code);
-document.getElementById('commentsModal').style.display='flex';
-}
-function closeCommentsModal(){
-document.getElementById('commentsModal').style.display='none';
-currentModalCode=null;
-}
+function openCommentsModal(code,name){ currentModalCode=code; document.getElementById('modalAssistantName').textContent=name; loadModalComments(code); document.getElementById('commentsModal').style.display='flex'; }
+function closeCommentsModal(){ document.getElementById('commentsModal').style.display='none'; currentModalCode=null; }
 function loadModalComments(code){
-const div=document.getElementById('modalCommentsList');
-div.innerHTML='';
-// يتم جلب التعليقات من الذاكرة المحلية (localStorage) للعرض
-let comments = JSON.parse(localStorage.getItem(`comments_${code}`)) || [];
+const div=document.getElementById('modalCommentsList'); div.innerHTML=''; 
+let comments = JSON.parse(localStorage.getItem(`comments_${code}`)) || []; 
 comments.slice(-20).forEach(c=>{
-const el=document.createElement('div');
-el.className='comment-item';
-el.innerHTML=`<span class="comment-name">${c.name||'زائر'}</span><span class="comment-stars">${'⭐'.repeat(c.rating)}</span><span class="comment-text">${c.text}</span>`;
+const el=document.createElement('div'); el.className='comment-item'; 
+el.innerHTML=`<span class="comment-name">${c.name||'زائر'}</span><span class="comment-stars">${'⭐'.repeat(c.rating)}</span><span class="comment-text">${c.text}</span>`; 
 div.appendChild(el);
 });
 }
 function submitModalComment(){
 if(!currentModalCode) return;
-const name = document.getElementById('modalCommentName').value.trim() || "زائر";
-const text = document.getElementById('modalCommentText').value.trim();
-const rating = parseInt(document.getElementById('modalCommentRating').value);
+const name=document.getElementById('modalCommentName').value.trim()||"زائر";
+const text=document.getElementById('modalCommentText').value.trim();
+const rating=parseInt(document.getElementById('modalCommentRating').value);
 if(!text) return;
-const comment = {name,text,rating};
-
-// 1. الحفظ في الذاكرة المحلية (localStorage)
-const localKey = `comments_${currentModalCode}`;
-const existing = JSON.parse(localStorage.getItem(localKey)) || [];
+const comment={name,text,rating};
+const localKey=`comments_${currentModalCode}`;
+const existing=JSON.parse(localStorage.getItem(localKey))||[];
 existing.push(comment);
-localStorage.setItem(localKey, JSON.stringify(existing));
-
-// 2. الحفظ في Firebase تحت كود المساعد (appId)
-const newRef = push(ref(db, `assistantComments/${currentModalCode}`));    
-set(newRef, comment);    
-
+localStorage.setItem(localKey,JSON.stringify(existing));
+const newRef=push(ref(db,`assistantComments/${currentModalCode}`)); set(newRef,comment);
 document.getElementById('modalCommentName').value='';    
 document.getElementById('modalCommentText').value='';    
 document.getElementById('modalCommentRating').value='5';    
 loadModalComments(currentModalCode);
-
 }
 
-// عرض البطاقات
+// Render cards
 async function renderCards(assistantsList,title){
 document.getElementById('roleTitleDisplay').textContent = title;
-const grid = document.getElementById('assistantCardsGrid');
-grid.innerHTML='';
+const grid = document.getElementById('assistantCardsGrid'); grid.innerHTML='';
 if(assistantsList.length===0){ grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون متاحون حالياً لهذا الدور.</p>'; return; }
 assistantsList.forEach(a=>{
-const card = document.createElement('div');
-card.className='assistant-card';
-card.setAttribute('data-id', a.appId); 
-
+const card=document.createElement('div'); card.className='assistant-card'; card.setAttribute('data-id',a.appId); 
 let details='';    
-    if(a.groupLimit){ details+=`<p><strong>التخصص:</strong> ${a.guideType||'عام'}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }    
-    else if(a.specialization){ details+=`<p><strong>التخصص:</strong> ${a.specialization}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }    
-    else if(a.cityPrice){ details+=`<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }    
-
-    // حساب التقييم الفردي باستخدام appId المساعد
-    const comments = JSON.parse(localStorage.getItem(`comments_${a.appId}`)) || [];    
-    const majorityRating = getMajorityRating(comments);    
-    const ratingHTML=`<div class="rating">${renderStars(majorityRating)}</div><div>(${a.experience} سنوات خبرة)</div>`;    
-
-    card.innerHTML=`    
-        <div class="card-header">    
-            <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">    
-            <div>    
-                <h3>${a.name}</h3>    
-                ${ratingHTML}    
-            </div>    
-        </div>    
-        <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>    
-        <button class="contact-btn" onclick="startChat('${a.appId}','${a.name}')">💬 تواصل الآن</button>    
-        <button class="comments-btn" onclick="openCommentsModal('${a.appId}','${a.name}')">💬 التعليقات</button>    
-    `;    
-    grid.appendChild(card);    
+if(a.groupLimit){ details+=`<p><strong>التخصص:</strong> ${a.guideType||'عام'}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }    
+else if(a.specialization){ details+=`<p><strong>التخصص:</strong> ${a.specialization}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }    
+else if(a.cityPrice){ details+=`<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }    
+const comments=JSON.parse(localStorage.getItem(`comments_${a.appId}`))||[];    
+const majorityRating=getMajorityRating(comments);    
+const ratingHTML=`<div class="rating">${renderStars(majorityRating)}</div><div>(${a.experience} سنوات خبرة)</div>`;    
+card.innerHTML=`
+<div class="card-header">    
+<img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">    
+<div>    
+<h3>${a.name}</h3>    
+${ratingHTML}    
+</div>    
+</div>    
+<div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>    
+<button class="contact-btn" onclick="startChat('${a.appId}','${a.name}')">💬 تواصل الآن</button>    
+<button class="comments-btn" onclick="openCommentsModal('${a.appId}','${a.name}')">💬 التعليقات</button>    
+`;    
+grid.appendChild(card);    
 });
-
 }
 
-// جلب البيانات مع التخزين في localStorage
+// Load data
 document.addEventListener('DOMContentLoaded', async()=>{
-const urlParams = new URLSearchParams(window.location.search);
-const roleKey = urlParams.get('role');
+const urlParams=new URLSearchParams(window.location.search);
+const roleKey=urlParams.get('role');
+const storageKey=roleKey ? `assistants_${roleKey}` : 'assistants_all';
+let cachedData=JSON.parse(localStorage.getItem(storageKey));
+if(cachedData){ renderCards(cachedData, roleKey ? ROLES[roleKey].name : "جميع المساعدين المتاحين"); }
 
-const storageKey = roleKey ? `assistants_${roleKey}` : 'assistants_all';    
-let cachedData = JSON.parse(localStorage.getItem(storageKey));    
-
-if(cachedData){    
-    renderCards(cachedData, roleKey ? ROLES[roleKey].name : "جميع المساعدين المتاحين");    
-}    
-
-// Fetch من Firebase
-if(roleKey){    
-    const snap = await get(ref(db,keyMap[roleKey]));    
-    if(snap.exists()){    
-        const data = Object.values(snap.val());    
-        localStorage.setItem(storageKey, JSON.stringify(data));    
-        renderCards(data, ROLES[roleKey].name);    
-    }    
-} else {    
-    const guides = (await get(ref(db,'assistants_guides'))).val() || {};    
-    const companions = (await get(ref(db,'assistants_companions'))).val() || {};    
-    const drivers = (await get(ref(db,'assistants_drivers'))).val() || {};    
-    
-    const guidesList = Object.values(guides);
-    const companionsList = Object.values(companions);
-    const driversList = Object.values(drivers);
-    
-    const data = [...guidesList,...companionsList,...driversList];    
-    localStorage.setItem(storageKey, JSON.stringify(data));    
-    renderCards(data, "جميع المساعدين المتاحين");    
+// Fetch Firebase
+let guidesList = [], companionsList = [], driversList = [];
+if(roleKey){
+const snap = await get(ref(db,keyMap[roleKey]));    
+if(snap.exists()){    
+const data=Object.values(snap.val());    
+localStorage.setItem(storageKey, JSON.stringify(data));    
+renderCards(data, ROLES[roleKey].name);    
 }
+}else{
+const guides=(await get(ref(db,'assistants_guides'))).val()||{};    
+const companions=(await get(ref(db,'assistants_companions'))).val()||{};    
+const drivers=(await get(ref(db,'assistants_drivers'))).val()||{};    
+guidesList=Object.values(guides); companionsList=Object.values(companions); driversList=Object.values(drivers);
+const data=[...guidesList,...companionsList,...driversList];    
+localStorage.setItem(storageKey, JSON.stringify(data));
 
+// تحديد العنوان الصحيح
+let displayTitle = "جميع المساعدين المتاحين";
+if(data.length===0) displayTitle="لا يوجد مساعدون متاحون حالياً";
+else if(data.every(a=>companionsList.includes(a))) displayTitle=ROLES.COMPANION.name;
+else if(data.every(a=>driversList.includes(a))) displayTitle=ROLES.DRIVER.name;
+else if(data.every(a=>guidesList.includes(a))) displayTitle=ROLES.GUIDE.name;
+
+renderCards(data, displayTitle);
+}
 });
 
-// هذه الدالة تمرر كود المساعد (appId) إلى صفحة الشات
+// دالة فتح الشات
 function startChat(code,name){ window.location.href=`chat_page.html?code=${code}`; }
 
-// ** إضافة الدوال للنطاق العام لحل مشكلة الـ Modal وزر التواصل **
-window.openCommentsModal = openCommentsModal;
-window.closeCommentsModal = closeCommentsModal;
-window.submitModalComment = submitModalComment;
-window.startChat = startChat;
+// نطاق عالمي
+window.openCommentsModal=openCommentsModal;
+window.closeCommentsModal=closeCommentsModal;
+window.submitModalComment=submitModalComment;
+window.startChat=startChat;
 
 </script>
 </body>
