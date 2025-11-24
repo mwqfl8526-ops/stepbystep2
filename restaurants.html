@@ -233,7 +233,7 @@ submitOrder.addEventListener('click', ()=>{
             time: new Date().toLocaleString('ar-EG',{timeZone:'Africa/Cairo', dateStyle:'short', timeStyle:'short'})
         };
 
-        const ordersRef = ref(db, `restaurantOrders/${currentPlaceCode}`);
+        const ordersRef = ref(db, `bookings/${currentPlaceCode}`);
         const newOrder = push(ordersRef);
         set(newOrder, orderData);
 
