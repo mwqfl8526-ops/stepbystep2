@@ -14,7 +14,7 @@ input, textarea, select, button { width:100%; padding:8px; border-radius:5px; bo
 button { margin-top:15px; cursor:pointer; background-color:#25d366; color:#fff; font-weight:bold; border:none; }
 button#goToManage { background-color:#128c7e; }
 #previewImg { max-width:100%; margin-top:10px; display:none; border-radius:5px; }
-.success { color: #00ff7f; margin-top:10px; font-weight:bold; white-space: pre-line; }
+.success { margin-top:10px; font-weight:bold; }
 </style>
 </head>
 <body>
@@ -59,7 +59,7 @@ button#goToManage { background-color:#128c7e; }
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, set, push } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 // إعدادات Firebase
 const firebaseConfig = {
@@ -75,25 +75,25 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 // عناصر الصفحة
-const placeType = document.getElementById('placeType');                
-const hotelFields = document.getElementById('hotelFields');                
-const otherFields = document.getElementById('otherFields');                
-const addPlaceBtn = document.getElementById('addPlaceBtn');                
-const successMsg = document.getElementById('successMsg');                
-const goToManage = document.getElementById('goToManage');                
-const placeFile = document.getElementById('placeFile');                
-const previewImg = document.getElementById('previewImg');                
-let placeBase64 = '';                
+const placeType = document.getElementById('placeType');                  
+const hotelFields = document.getElementById('hotelFields');                  
+const otherFields = document.getElementById('otherFields');                  
+const addPlaceBtn = document.getElementById('addPlaceBtn');                  
+const successMsg = document.getElementById('successMsg');                  
+const goToManage = document.getElementById('goToManage');                  
+const placeFile = document.getElementById('placeFile');                  
+const previewImg = document.getElementById('previewImg');                  
+let placeBase64 = '';                 
 
 // توليد الكود وكلمة السر
 function generateCode(length=6){
-    const chars = 'ABC0123456789';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for(let i=0;i<length;i++) result += chars.charAt(Math.floor(Math.random()*chars.length));
     return result;
 }
 function generatePassword(length=8){
-    const chars = 'abcABC0123456789';
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let result = '';
     for(let i=0;i<length;i++) result += chars.charAt(Math.floor(Math.random()*chars.length));
     return result;
@@ -121,7 +121,7 @@ placeFile.addEventListener('change', (e)=>{
     }
 });
 
-// حفظ المكان في Firebase باسم المكان نفسه
+// حفظ المكان في Firebase مع توليد الكود وكلمة السر
 async function addPlaceToFirebase(type, itemData){
     let collectionName = 'hotels';
     if(type==='restaurant') collectionName='restaurants';
@@ -131,9 +131,9 @@ async function addPlaceToFirebase(type, itemData){
     itemData.password = generatePassword();
 
     try{
-        const placeRef = ref(db, `${collectionName}/${itemData.name}`);
-        await set(placeRef, itemData);
-        return itemData;
+        const newRef = push(ref(db, collectionName));
+        await set(newRef, itemData);
+        return itemData; // نعيد الكائن بالكامل مع الكود وكلمة السر
     } catch(err){
         console.error(err);
         return null;
@@ -147,61 +147,62 @@ addPlaceBtn.addEventListener('click', async ()=>{
     const img = placeBase64 || document.getElementById('placeImage').value.trim();
     const map = document.getElementById('placeMap').value.trim();
 
-    let priceNight='', priceWeek='', priceMonth='', extras='', delivery='no', otherInfo='', category='';                
-    if(type==='hotel'){                
-        priceNight = document.getElementById('priceNight').value.trim();                
-        priceWeek = document.getElementById('priceWeek').value.trim();                
-        priceMonth = document.getElementById('priceMonth').value.trim();                
-        extras = document.getElementById('hotelExtras').value.trim();                
-    } else {                
-        category = document.getElementById('placeCategory').value.trim();
-        delivery = document.getElementById('deliveryService').value;                
-        otherInfo = document.getElementById('otherInfo').value.trim();                
-    }
+    let priceNight='', priceWeek='', priceMonth='', extras='', delivery='no', otherInfo='', category='';                    
+    if(type==='hotel'){                    
+        priceNight = document.getElementById('priceNight').value.trim();                    
+        priceWeek = document.getElementById('priceWeek').value.trim();                    
+        priceMonth = document.getElementById('priceMonth').value.trim();                    
+        extras = document.getElementById('hotelExtras').value.trim();                    
+    } else {                    
+        category = document.getElementById('placeCategory').value.trim();    
+        delivery = document.getElementById('deliveryService').value;                    
+        otherInfo = document.getElementById('otherInfo').value.trim();                    
+    }    
 
-    if(!name || !img){ alert('يرجى تعبئة الاسم والصورة'); return; }
+    if(!name || !img){ alert('يرجى تعبئة الاسم والصورة'); return; }    
 
-    const itemData = { name, photoBase64: img, gmapsLink: map };                
-    if(type==='hotel'){ 
-        itemData.priceNight=priceNight; 
-        itemData.priceWeek=priceWeek; 
-        itemData.priceMonth=priceMonth; 
-        itemData.extras=extras; 
-    } else { 
-        itemData.category = category;
-        itemData.delivery = delivery; 
-        itemData.otherInfo = otherInfo; 
-    }                
-
-    // عرض رسالة جاري المعالجة
-    successMsg.style.display='block';  
-    successMsg.style.color = '#ffc107'; // لون أصفر للانتظار
+    // رسالة جاري المعالجة
+    successMsg.style.display = 'block';
+    successMsg.style.color = '#ffc107';
     successMsg.textContent = '⏳ جاري معالجة البيانات، انتظر قليلاً...';
 
-    const savedItem = await addPlaceToFirebase(type, itemData);
+    const itemData = { name, photoBase64: img, gmapsLink: map };                    
+    if(type==='hotel'){     
+        itemData.priceNight = priceNight;     
+        itemData.priceWeek = priceWeek;     
+        itemData.priceMonth = priceMonth;     
+        itemData.extras = extras;     
+    } else {     
+        itemData.category = category;    
+        itemData.delivery = delivery;     
+        itemData.otherInfo = otherInfo;     
+    }                    
+    
+    const savedItem = await addPlaceToFirebase(type, itemData);    
 
-    if(savedItem){
-        successMsg.style.color = '#00ff7f'; // أخضر للنجاح
-        successMsg.innerHTML = `✅ تم حفظ المكان بنجاح!\n<br>كود المكان: ${savedItem.code}<br>كلمة السر: ${savedItem.password}\n<br>يرجى حفظهم للوصول لاحقاً.`;
+    // بعد الحفظ، عرض الرسالة بشكل منظم
+    if(savedItem){    
+        successMsg.style.color = '#00ff7f';
+        successMsg.innerHTML = `✅ تم حفظ المكان بنجاح!<br>كود المكان: <strong>${savedItem.code}</strong><br>كلمة السر: <strong>${savedItem.password}</strong><br>يرجى حفظهم للوصول لاحقاً.`;                    
 
-        // إعادة تعيين الحقول
-        document.getElementById('placeName').value='';                  
-        document.getElementById('placeImage').value='';                  
-        document.getElementById('placeMap').value='';                  
-        document.getElementById('priceNight').value='';                  
-        document.getElementById('priceWeek').value='';                  
-        document.getElementById('priceMonth').value='';                  
-        document.getElementById('hotelExtras').value='';                  
-        if(type !== 'hotel') {  
-            document.getElementById('placeCategory').value = '';  
-            document.getElementById('otherInfo').value='';  
-        }  
-        placeBase64='';                  
-        previewImg.style.display='none';  
-    } else {
-        successMsg.style.color = 'red';
-        successMsg.textContent = '❌ حدث خطأ أثناء الحفظ.';
-    }
+        // إعادة ضبط الحقول
+        document.getElementById('placeName').value = '';                    
+        document.getElementById('placeImage').value = '';                    
+        document.getElementById('placeMap').value = '';                    
+        document.getElementById('priceNight').value = '';                    
+        document.getElementById('priceWeek').value = '';                    
+        document.getElementById('priceMonth').value = '';                    
+        document.getElementById('hotelExtras').value = '';                    
+        if(type !== 'hotel') {    
+            document.getElementById('placeCategory').value = '';    
+            document.getElementById('otherInfo').value='';    
+        }    
+        placeBase64 = '';                    
+        previewImg.style.display = 'none';      
+    } else {    
+        successMsg.style.color = '#ff4c4c';
+        successMsg.textContent = '❌ حدث خطأ أثناء الحفظ.';    
+    }    
 });
 
 goToManage.addEventListener('click', ()=>{
