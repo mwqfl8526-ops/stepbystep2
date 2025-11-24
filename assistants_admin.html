@@ -1,29 +1,21 @@
-<!DOCTYPE html>  
-<html lang="ar" dir="rtl">  
-<head>  
-<meta charset="UTF-8">  
-<meta name="viewport" content="width=device-width, initial-scale=1.0">  
-<title>إدارة المساعدين السياحيين</title>  
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>إدارة المساعدين السياحيين</title>
 <style>
 :root {
-    --dark-bg: #121212;
-    --card-bg: #1f1f1f;
-    --gold: #ffc107;
-    --blue-royal: #4a6fa5;
-    --white: #e0e0e0;
-    --border-color: #333333;
-    --red-emergency: #cf6679;
-    --green-success: #4caf50;
-    --yellow-warning: #ffeb3b;
-    --text-color: #e0e0e0;
+  --dark-bg:#121212; --card-bg:#1f1f1f; --gold:#ffc107; --blue-royal:#4a6fa5;
+  --white:#e0e0e0; --red-emergency:#cf6679; --green-success:#4caf50; --text-color:#e0e0e0;
 }
-body {background-color: var(--dark-bg); color: var(--text-color); font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0;}
-.header-controls {display:flex; justify-content:flex-end; padding:15px; background-color:#1f1f1f; border-bottom:1px solid var(--border-color);}
-.btn-back {background-color:var(--blue-royal); color:#fff; padding:8px 15px; border-radius:6px; text-decoration:none; font-size:0.9em; transition:background-color 0.3s; border:none; cursor:pointer; margin-left:10px;}
-.btn-back:hover {background-color:#3b5b82;}
-.container{ max-width:1000px; margin:20px auto; }
+body{background-color:var(--dark-bg); color:var(--text-color); font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:0;}
+.header-controls{display:flex; justify-content:flex-end; padding:15px; background-color:#1f1f1f; border-bottom:1px solid #333;}
+.btn-back{background-color:var(--blue-royal); color:#fff; padding:8px 15px; border-radius:6px; text-decoration:none; font-size:0.9em; cursor:pointer; margin-left:10px;}
+.btn-back:hover{background-color:#3b5b82;}
+.container{ max-width:1000px; margin:20px auto; position:relative; }
 .role-select{ margin-bottom:20px; padding:10px; border-radius:6px; border:1px solid var(--blue-royal); background-color:#2a2a2a; color:#fff; }
-.filter-input { width: 100%; padding: 12px; margin-bottom: 20px; border-radius: 6px; border: 1px solid var(--blue-royal); background-color: #2a2a2a; color: var(--white); font-size: 1em; }
+.filter-input{ width:100%; padding:12px; margin-bottom:20px; border-radius:6px; border:1px solid var(--blue-royal); background-color:#2a2a2a; color:var(--white); font-size:1em; }
 .cards-grid{ display:grid; grid-template-columns: repeat(auto-fill,minmax(300px,1fr)); gap:25px; }
 .assistant-card{ background-color:#2a2a2a; border-radius:10px; padding:20px; box-shadow:0 4px 15px rgba(0,0,0,0.4); border:1px solid var(--blue-royal); position:relative; transition:transform 0.3s,border-color 0.3s; }
 .assistant-card:hover{ transform:translateY(-5px); border-color:var(--gold); }
@@ -32,51 +24,36 @@ body {background-color: var(--dark-bg); color: var(--text-color); font-family:'S
 .card-header h3{ color:var(--gold); margin:0; font-size:1.4em; }
 .card-details p{ margin:8px 0; text-align:right; font-size:0.95em; color:#ccc; }
 .card-details strong{ color:var(--white); }
-.rating{ color: var(--yellow-warning); font-size:1.1em; margin-top:5px; }
+.rating{ color: var(--text-color); font-size:1.1em; margin-top:5px; }
 .btn-delete{ margin-top:10px; padding:10px 16px; border:none; border-radius:6px; background-color:var(--red-emergency); color:#fff; cursor:pointer; font-size:1.1em; width:48%; display:inline-block; }
-.btn-comments { background-color:var(--green-success); margin-left:4%; } /* تعديل بسيط للتنسيق */
-#commentsModal{ display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background-color:rgba(0,0,0,0.6); justify-content:center; align-items:center; }
-#commentsModal .modal-content{ background-color:#2a2a2a; padding:20px; border-radius:10px; max-width:500px; width:90%; max-height:70%; overflow-y:auto; }
-.comment-item{ margin-bottom:10px; border-bottom:1px dashed #555; padding-bottom:5px; display:flex; justify-content:space-between; align-items:center; }
-.comment-info { flex-grow: 1; margin-right: 10px; }
-.comment-name{ font-weight:bold; color:var(--gold); display:block; }
-.comment-stars{ color:var(--yellow-warning); display:block; margin:2px 0; }
-.comment-text{ display:block; color:#ccc; margin-top:2px; }
-.close-modal{ float:right; cursor:pointer; font-size:1.2em; color:#fff; }
+.btn-comments { background-color:var(--green-success); margin-left:4%; }
+.notification-box { position:absolute; top:0; left:50%; transform:translateX(-50%); background-color:var(--green-success); color:#fff; padding:8px 12px; border-radius:6px; margin-top:10px; display:none; z-index:2000; }
 </style>
-</head>  
+</head>
 
-<body>  
-<div class="header-controls">  
-    <a href="manager_dashboard.html" class="btn-back">🔙 الصفحة الرئيسية</a>  
-</div>  
+<body>
+<div class="header-controls">
+  <a href="manager_dashboard.html" class="btn-back">🔙 الصفحة الرئيسية</a>
+</div>
 
-<div class="container">  
-    <h1>إدارة المساعدين السياحيين</h1>  
+<div class="container">
+  <h1>إدارة المساعدين السياحيين</h1>
+  <div id="notificationBox" class="notification-box"></div>
 
-    <select id="roleSelect" class="role-select">  
-        <option value="">-- اختر الدور لعرض المساعدين --</option>  
-        <option value="GUIDE">مرشدين</option>  
-        <option value="COMPANION">مرافقين</option>  
-        <option value="DRIVER">سائقين</option>  
-    </select>  
-    
-    <input type="text" id="assistantSearch" class="filter-input" placeholder="ابحث باسم المساعد أو التخصص..." onkeyup="window.filterAssistants()">
+  <select id="roleSelect" class="role-select">
+    <option value="">-- اختر الدور لعرض المساعدين --</option>
+    <option value="GUIDE">مرشدين</option>
+    <option value="COMPANION">مرافقين</option>
+    <option value="DRIVER">سائقين</option>
+  </select>
 
-    <div id="assistantCardsGrid" class="cards-grid"></div>  
-</div>  
-
-<div id="commentsModal">  
-    <div class="modal-content">  
-        <span class="close-modal" onclick="window.closeCommentsModal()">✖</span>  
-        <h2 style="color: var(--gold); border-bottom:1px solid #444; padding-bottom:10px;">تعليقات المساعد</h2>
-        <div id="modalCommentsList"></div>  
-    </div>  
-</div>  
+  <input type="text" id="assistantSearch" class="filter-input" placeholder="ابحث باسم المساعد أو التخصص..." onkeyup="window.filterAssistants()">
+  <div id="assistantCardsGrid" class="cards-grid"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, remove, onValue, off } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, remove } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
@@ -90,215 +67,90 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
-
-const roleSelect = document.getElementById('roleSelect');  
-const modal = document.getElementById('commentsModal');  
-const modalCommentsList = document.getElementById('modalCommentsList');  
+const roleSelect = document.getElementById('roleSelect');
+const grid = document.getElementById('assistantCardsGrid');
+const notificationBox = document.getElementById('notificationBox');
 
 const ROLES = { GUIDE:'assistants_guides', COMPANION:'assistants_companions', DRIVER:'assistants_drivers' };
 let currentRoleKey = '';
-
 let allAssistants = [];
-let activeListeners = [];
 
-roleSelect.addEventListener('change', () => { 
-    currentRoleKey = roleSelect.value;
-    loadAndRenderAssistants(currentRoleKey); 
-});  
+roleSelect.addEventListener('change', () => {
+  currentRoleKey = roleSelect.value;
+  loadAndRenderAssistants(currentRoleKey);
+});
 
 function renderStars(rating){ return '⭐'.repeat(rating)+'☆'.repeat(5-rating); }
 
-function getMajorityRating(comments){
-    if(!comments || Object.keys(comments).length===0) return 5;
-    const commentsArray = Array.isArray(comments) ? comments : Object.values(comments); 
-    const counts = {};
-    commentsArray.forEach(c=>counts[c.rating]=(counts[c.rating]||0)+1);
-    let max=0, major=5;
-    for(const r in counts){ if(counts[r]>max){ max=counts[r]; major=parseInt(r); } }
-    return major;
+function renderCards(list) {
+  grid.innerHTML='';
+  if(list.length===0){ grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون بهذا الدور.</p>'; return; }
+
+  list.forEach(a=>{
+    const card = document.createElement('div');
+    card.className='assistant-card';
+    card.innerHTML=`
+      <div class="card-header">
+        <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
+        <div>
+          <h3>${a.name}</h3>
+          <div class="rating">${renderStars(5)} (${a.experience || 0} سنوات)</div>
+        </div>
+      </div>
+      <div class="card-details">
+        <p><strong>نبذة:</strong> ${a.about||''}</p>
+      </div>
+      <button class="btn-delete" onclick="window.deleteAssistant('${currentRoleKey}','${a.appId}')">حذف المساعد</button>
+    `;
+    grid.appendChild(card);
+  });
 }
 
-function stopListeners() {
-    activeListeners.forEach(off);
-    activeListeners = [];
-}
+// جلب وعرض المساعدين
+async function loadAndRenderAssistants(roleKey){
+  grid.innerHTML='<p style="text-align:center;color:#ccc;">جاري جلب البيانات...</p>';
+  if(!roleKey){ grid.innerHTML=''; return; }
 
-function renderCards(assistantsList, roleKey) {
-    stopListeners();
-    const grid = document.getElementById('assistantCardsGrid');  
-    grid.innerHTML = '';  
-    if(assistantsList.length===0){ 
-        grid.innerHTML='<p style="text-align:center;color:#aaa;">لا يوجد مساعدون بهذا الدور أو لا يوجد نتائج للبحث.</p>'; 
-        return; 
+  try{
+    const snapshot = await get(ref(db, ROLES[roleKey]));
+    const data = snapshot.val() ? Object.values(snapshot.val()) : [];
+
+    // التحقق من المساعدين الجدد
+    const prevIds = allAssistants.map(a=>a.appId);
+    const newAssistants = data.filter(a=>!prevIds.includes(a.appId));
+    if(newAssistants.length>0){
+      notificationBox.style.display='block';
+      notificationBox.innerHTML=`${newAssistants.length} مساعد جديد: ${newAssistants.map(a=>a.name).join(', ')}`;
+      setTimeout(()=>{ notificationBox.style.display='none'; }, 5000);
     }
 
-    assistantsList.forEach(a=>{
-        const assistantId = a.appId;
-        const card = document.createElement('div');
-        card.className='assistant-card';
-        card.setAttribute('data-name', a.name.toLowerCase());
-        card.setAttribute('data-type', (a.guideType || a.specialization || a.role || '').toLowerCase());
-        
-        let details='';
-        if(a.groupLimit){ details += `<p><strong>التخصص:</strong> ${a.guideType||''}</p><p><strong>حد المجموعة:</strong> ${a.groupLimit} شخص</p><p><strong>سعر اليوم:</strong> ${a.price} درهم</p>`; }
-        else if(a.specialization){ details += `<p><strong>التخصص:</strong> ${a.specialization||''}</p><p><strong>سعر اليوم:</strong> ${a.priceDay} درهم</p><p><strong>سعر الساعة:</strong> ${a.priceHour} درهم</p>`; }
-        else if(a.cityPrice){ details += `<p><strong>أجرة المدينة:</strong> ${a.cityPrice} درهم</p><p><strong>أجرة خارج المدينة:</strong> ${a.outCityPrice} درهم</p>`; }
+    allAssistants = data;
+    renderCards(allAssistants);
 
-        const initialRating = 5;
-
-        card.innerHTML=`
-            <div class="card-header">
-                <img src="${a.img||'images/placeholder_profile.png'}" class="profile-img" alt="${a.name}">
-                <div>
-                    <h3>${a.name}</h3>
-                    <div class="rating" id="rating-${assistantId}">${renderStars(initialRating)} (${a.experience} سنوات)</div>
-                </div>
-            </div>
-            <div class="card-details">${details}<p><strong>نبذة:</strong> ${a.about}</p></div>
-            <button class="btn-delete" onclick="window.deleteAssistant('${roleKey}','${assistantId}')">حذف المساعد</button>
-            <button class="btn-comments" onclick="window.openCommentsModal('${assistantId}')">عرض التعليقات</button>
-        `;
-        grid.appendChild(card);
-
-        const ratingElement = document.getElementById(`rating-${assistantId}`);
-        const commentsRef = ref(db, `assistantComments/${assistantId}`);
-        
-        const listener = onValue(commentsRef, snap=>{
-            const commentsData = snap.val() || {};
-            const majorityRating = getMajorityRating(commentsData);
-            ratingElement.innerHTML = `${renderStars(majorityRating)} (${a.experience} سنوات)`;
-        });
-        activeListeners.push(listener);
-    });
+  } catch(err){
+    console.error(err);
+    grid.innerHTML='<p style="text-align:center;color:var(--red-emergency);">فشل جلب البيانات. تحقق من الاتصال أو الصلاحيات.</p>';
+  }
 }
 
-async function loadAndRenderAssistants(roleKey) {
-    const grid = document.getElementById('assistantCardsGrid');  
-
-    if (!roleKey) {
-        grid.innerHTML = '';
-        return;
-    }
-
-    grid.innerHTML = '<p style="text-align:center;color:#ccc;">جاري جلب البيانات من Firebase...</p>';
-    allAssistants = [];
-
-    try {
-        const snapshot = await get(ref(db, ROLES[roleKey]));
-        const rawData = snapshot.val();
-        const freshData = rawData ? Object.values(rawData) : [];
-
-        allAssistants = freshData;
-        renderCards(allAssistants, roleKey);
-        
-        if (allAssistants.length === 0) {
-             grid.innerHTML = '<p style="text-align:center;color:#aaa;">لا يوجد مساعدون مسجلون لهذا الدور.</p>';
-        }
-
-    } catch(error) {
-        console.error("Error fetching data from Firebase:", error);
-        grid.innerHTML = '<p style="text-align:center;color:var(--red-emergency);">فشل جلب البيانات. الرجاء التحقق من الاتصال أو قاعدة البيانات (القواعد/المسار).</p>';
-    }
+// حذف مساعد
+window.deleteAssistant = async function(roleKey, appId){
+  if(!confirm('هل تريد حذف هذا المساعد؟')) return;
+  try{
+    await remove(ref(db, `${ROLES[roleKey]}/${appId}`));
+    allAssistants = allAssistants.filter(a=>a.appId!==appId);
+    renderCards(allAssistants);
+  } catch(err){
+    alert('فشل حذف المساعد: ' + err.message);
+  }
 }
 
-window.filterAssistants = function() {
-    const searchTerm = document.getElementById('assistantSearch').value.toLowerCase();
-    
-    const filteredList = allAssistants.filter(a => {
-        const nameMatch = a.name.toLowerCase().includes(searchTerm);
-        const specializationMatch = (a.guideType || a.specialization || a.role || '').toLowerCase().includes(searchTerm);
-        return nameMatch || specializationMatch;
-    });
-    renderCards(filteredList, currentRoleKey);
+// فلترة المساعدين
+window.filterAssistants = function(){
+  const term = document.getElementById('assistantSearch').value.toLowerCase();
+  const filtered = allAssistants.filter(a=> (a.name||'').toLowerCase().includes(term));
+  renderCards(filtered);
 }
-
-
-// الدالة المُعدّلة لضمان حذف المساعد بنجاح قبل إظهار رسالة النجاح
-window.deleteAssistant = async function(roleKey, appId){ 
-    if(!confirm('هل أنت متأكد من حذف هذا المساعد؟ سيتم حذف جميع بياناته وتعليقاته.')) return;
-    
-    const assistantPath = `${ROLES[roleKey]}/${appId}`;
-    const commentsPath = `assistantComments/${appId}`;
-    let successMessage = "تم حذف المساعد وتعليقاته بنجاح.";
-    
-    // 1. محاولة حذف بيانات المساعد الرئيسية (المفتاح appId)
-    try {
-        await remove(ref(db, assistantPath));
-        
-        // 2. إذا نجح حذف المساعد، حاول حذف التعليقات
-        try {
-            await remove(ref(db, commentsPath));
-        } catch(commentError) {
-            console.warn("تم حذف المساعد بنجاح، لكن فشل حذف التعليقات:", commentError.message);
-            successMessage = "تم حذف المساعد بنجاح، لكن فشل حذف تعليقاته (ربما بسبب مشاكل في الصلاحيات).";
-        }
-        
-        alert(successMessage);
-        
-        // 3. إعادة تحميل وعرض القائمة لتحديث الواجهة
-        loadAndRenderAssistants(roleKey); 
-
-    } catch(error) {
-        console.error("Error deleting assistant:", error);
-        
-        // إذا فشل حذف المساعد نفسه، أظهر رسالة خطأ واضحة
-        let errorMessage = "❌ فشل حذف المساعد: يرجى التأكد من صلاحيات الأمان (Firebase Rules) للسماح بالحذف في المسار:\n" + assistantPath;
-        if (error.message.includes("permission_denied")) {
-             errorMessage += "\n\nالخطأ يشير إلى رفض الإذن (Permission Denied). تأكد أن مسارات الأدوار مفتوحة للكتابة (write: true).";
-        } else {
-             errorMessage = "فشل حذف المساعد: " + error.message;
-        }
-
-        alert(errorMessage);
-    }
-}
-
-window.openCommentsModal = function(appId){ 
-    modalCommentsList.innerHTML='<p style="text-align:center;color:#ccc;">جاري التحميل...</p>';
-    modal.style.display='flex';
-
-    get(ref(db, `assistantComments/${appId}`)).then(snapshot => {
-        modalCommentsList.innerHTML='';
-        const comments = snapshot.val() || {};
-        const commentKeys = Object.keys(comments);
-        
-        if(commentKeys.length===0){ 
-            modalCommentsList.innerHTML='<p style="color:#aaa;text-align:center;">لا يوجد تعليقات حتى الآن.</p>'; 
-        } else {
-            commentKeys.forEach((key) => {
-                const c = comments[key];
-                const div=document.createElement('div');
-                div.className='comment-item';
-                
-                div.innerHTML=`<span class="comment-info"><span class="comment-name">${c.name||'غير معروف'}</span><span class="comment-stars">${renderStars(c.rating)}</span><span class="comment-text">${c.text}</span></span>`;
-                
-                const delBtn=document.createElement('button');
-                delBtn.textContent="🗑️"; delBtn.style.cssText="background:var(--red-emergency);border:none;color:#fff;padding:6px 10px;border-radius:6px;cursor:pointer;";
-                
-                delBtn.onclick=async()=>{ 
-                    if(confirm('هل تريد حذف هذا التعليق؟')){ 
-                        try {
-                            await remove(ref(db, `assistantComments/${appId}/${key}`)); 
-                            window.openCommentsModal(appId); 
-                        } catch(error) {
-                            alert("فشل حذف التعليق: " + error.message);
-                        }
-                    } 
-                };
-                div.appendChild(delBtn);
-                modalCommentsList.appendChild(div);
-            });
-        }
-    }).catch(error => {
-        console.error("Error fetching comments:", error);
-        modalCommentsList.innerHTML='<p style="color:var(--red-emergency);text-align:center;">فشل جلب التعليقات.</p>';
-    });
-}
-
-window.closeCommentsModal = function(){ 
-    modal.style.display='none'; 
-}
-
 </script>
-</body>  
+</body>
 </html>
