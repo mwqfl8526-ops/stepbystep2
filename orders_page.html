@@ -38,8 +38,9 @@ button { padding:10px 15px; border:none; border-radius:5px; cursor:pointer; font
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-app.js";
-import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
+import { getDatabase, ref, get, set, remove, onValue } from "https://www.gstatic.com/firebasejs/10.1.0/firebase-database.js";
 
+// إعداد Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyDpVqFWJfB4rA2-NA4QIl1w07e2LFQaYic",
   authDomain: "tourguideapp-313c1.firebaseapp.com",
@@ -61,41 +62,27 @@ const placeTitle = document.getElementById('placeTitle');
 const notifSound = document.getElementById('notifSound');
 
 let currentPlaceCode = null;
-let lastOrdersCount = 0;
+let knownOrders = new Set(); // لتتبع الطلبات الموجودة
 
-// طلب إذن الإشعارات
-if ("Notification" in window && Notification.permission !== "granted") {
-    Notification.requestPermission();
-}
-
-async function displayOrders(){
-    if(!currentPlaceCode) return;
-
-    const ordersRef = ref(db,'bookings/'+currentPlaceCode);
-    const snapshot = await get(ordersRef);
-    const ordersObj = snapshot.exists() ? snapshot.val() : {};
-    const ordersKeys = Object.keys(ordersObj);
-
-    // تشغيل الصوت والإشعار للطلبات الجديدة
-    if(ordersKeys.length > lastOrdersCount){
-        notifSound.play();
-        if ("Notification" in window && Notification.permission === "granted") {
-            const latestOrder = ordersObj[ordersKeys[ordersKeys.length-1]];
-            new Notification("طلب جديد", {
-                body: `وصل طلب جديد من ${latestOrder.name}`,
-                icon: 'https://cdn-icons-png.flaticon.com/512/3081/3081932.png'
-            });
-        }
+// عرض الطلبات
+async function displayOrders(snapshotData=null){
+    let ordersObj;
+    if(snapshotData){
+        ordersObj = snapshotData;
+    } else {
+        const snap = await get(ref(db,'bookings/'+currentPlaceCode));
+        ordersObj = snap.exists() ? snap.val() : {};
     }
-    lastOrdersCount = ordersKeys.length;
 
     ordersContainer.innerHTML='';
-    if(ordersKeys.length===0){
+    const keys = Object.keys(ordersObj);
+
+    if(keys.length===0){
         ordersContainer.innerHTML='<p style="text-align:center; color:#ffa500;">لا توجد طلبات جديدة بعد.</p>';
         return;
     }
 
-    ordersKeys.forEach((key,i)=>{
+    keys.forEach((key,i)=>{
         const order = ordersObj[key];
         const div = document.createElement('div');
         div.className='order-card';
@@ -114,41 +101,69 @@ async function displayOrders(){
     });
 }
 
-async function saveOrders(orders){
-    if(!currentPlaceCode) return;
-    await set(ref(db,'bookings/'+currentPlaceCode), orders);
-}
-
-refreshBtn.addEventListener('click', displayOrders);
-
-deleteAllBtn.addEventListener('click', async ()=>{
-    if(!currentPlaceCode) return;
-    if(confirm('هل تريد حذف جميع الطلبات؟')){
-        await set(ref(db,'bookings/'+currentPlaceCode), {});
-        lastOrdersCount = 0;
-        displayOrders();
-    }
-});
-
-document.getElementById('backToLoginBtn').addEventListener('click', () => {
-    window.location.href = 'login_page.html';
-});
-
+// حذف طلب معين
 window.deleteOrder = async function(key){
     if(!currentPlaceCode) return;
     if(confirm('هل تريد حذف هذا الطلب؟')){
-        await set(ref(db,'bookings/'+currentPlaceCode+'/'+key), null);
-        lastOrdersCount -= 1;
+        await remove(ref(db,'bookings/'+currentPlaceCode+'/'+key));
+        knownOrders.delete(key);
         displayOrders();
     }
 }
 
+// فتح موقع
 window.openLocation = function(lat,lng){
     window.open(`http://maps.google.com/?q=${lat},${lng}`,'_blank');
 }
 
-// تحميل أولي عند فتح الصفحة + تحديث كل 5 ثواني
-document.addEventListener('DOMContentLoaded', async () => {
+// تحميل الطلبات ومراقبتها
+async function monitorOrders(){
+    const ordersRef = ref(db,'bookings/'+currentPlaceCode);
+    onValue(ordersRef, snapshot=>{
+        const data = snapshot.exists() ? snapshot.val() : {};
+        const keys = Object.keys(data);
+
+        // إشعارات للطلبات الجديدة
+        keys.forEach(key=>{
+            if(!knownOrders.has(key)){
+                knownOrders.add(key);
+                notifSound.play();
+                if("Notification" in window && Notification.permission === "granted"){
+                    new Notification("طلب جديد", {
+                        body: `وصل طلب جديد من ${data[key].name}`,
+                        icon: "https://cdn-icons-png.flaticon.com/512/3081/3081932.png"
+                    });
+                }
+            }
+        });
+
+        displayOrders(data);
+    });
+}
+
+// أزرار
+deleteAllBtn.addEventListener('click', async ()=>{
+    if(!currentPlaceCode) return;
+    if(confirm('هل تريد حذف جميع الطلبات؟')){
+        await set(ref(db,'bookings/'+currentPlaceCode), {});
+        knownOrders.clear();
+        displayOrders({});
+    }
+});
+
+refreshBtn.addEventListener('click', ()=> displayOrders());
+
+document.getElementById('backToLoginBtn').addEventListener('click', ()=>{
+    window.location.href='login_page.html';
+});
+
+// طلب إذن إشعارات
+if("Notification" in window && Notification.permission !== "granted"){
+    Notification.requestPermission();
+}
+
+// بدء المراقبة عند فتح الصفحة
+document.addEventListener('DOMContentLoaded', async ()=>{
     const urlParams = new URLSearchParams(window.location.search);
     const codeFromURL = urlParams.get('code');
     if(!codeFromURL){
@@ -157,8 +172,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     currentPlaceCode = codeFromURL;
     placeTitle.textContent = currentPlaceCode;
-    await displayOrders();
-    setInterval(displayOrders, 5000);
+    monitorOrders();
 });
 </script>
 </div>
