@@ -228,7 +228,7 @@
         const ticket = sessionStorage.getItem('currentTicket');  
         if(!ticket){  
             alert("⚠️ يجب تسجيل الدخول أولاً باستخدام كود التذكرة.");  
-            window.location.href = 'login.html';  
+            window.location.href = 'index.html';  
         }  
   
         const firebaseConfig = {    
@@ -269,7 +269,7 @@
   
         function logoutTourist() {    
             sessionStorage.removeItem('currentTicket');    
-            window.location.href = 'login.html';    
+            window.location.href = 'index.html';    
         }    
   
         /* ================================
