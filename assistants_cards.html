@@ -122,7 +122,7 @@ async function displayAssistants(roleKey,minRating=0,typeFilter='all'){
     const rating = getMajorityRating(comments);
     const card = document.createElement('div'); card.className='assistant-card';
     let details='';
-    if(a.groupLimit){ details+=`<p>التخصص: ${a.guideType||'عام'}</p><p>حد المجموعة: ${a.groupLimit}</p><p>سعر اليوم: ${a.price} درهم</p>`;}
+    if(a.groupLimit){ details+=`<p>التخصص: ${a.guideType||'عام'}</p><p>حد المجموعة: ${a.groupLimit}</p><p>سعر اليوم: ${a.price} جنيه مصري</p>`;}
     else if(a.specialization){ details+=`<p>التخصص: ${a.specialization}</p><p>سعر اليوم: ${a.priceDay}</p><p>سعر الساعة: ${a.priceHour}</p>`;}
     else if(a.cityPrice){ details+=`<p>أجرة المدينة: ${a.cityPrice}</p><p>أجرة خارج المدينة: ${a.outCityPrice}</p>`;}
     card.innerHTML=`<h3>${a.name}</h3>${details}<p class="rating">${renderStars(rating)}</p>
